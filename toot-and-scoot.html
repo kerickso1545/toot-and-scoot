@@ -567,9 +567,7 @@ var worldMeshes = [];
 function buildWorld() {
   clearGroup(worldMeshes); worldMeshes = [];
   crateMeshes = {};
-  currentMaze = twoPlayer
-    ? MAZES[Math.floor(Math.random() * MAZES.length)]
-    : MAZES[(level - 1) % MAZES.length];
+  currentMaze = MAZES[(level - 1) % MAZES.length];
   grid = [];
   for (var z = 0; z < ROWS; z++) {
     grid[z] = [];
@@ -784,7 +782,10 @@ function startLevel(keepStats) {
     think:       Math.max(0.05, 0.15 - t * 0.01)
   };
 
-  var superType = SUPERS[(twoPlayer ? round2p : level - 1) % SUPERS.length];
+  var superType = SUPERS[(level - 1) % SUPERS.length];
+  var prevW1 = keepStats && player ? (player.wins || 0) : 0;
+  var prevW2 = keepStats && player2 ? (player2.wins || 0) : 0;
+  var prevW3 = keepStats && player3 ? (player3.wins || 0) : 0;
   var c = tileCenter(levelSpawns[0][0], levelSpawns[0][1]);
   var prev = keepStats && !twoPlayer && player ? player : null;
   player = {
@@ -795,6 +796,7 @@ function startLevel(keepStats) {
     range:    prev ? prev.range    : 2,
     held:     prev ? prev.held     : null,
     score:    prev ? prev.score    : 0,
+    wins:     prevW1,
     maskTime: 0,
     superType: superType,
     superUsed: false
@@ -806,7 +808,7 @@ function startLevel(keepStats) {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
-      speed: 5, maxBombs: 1, range: 2, held: null,
+      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2,
       maskTime: 0, superType: superType, superUsed: false
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
@@ -818,7 +820,7 @@ function startLevel(keepStats) {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
-        speed: 5, maxBombs: 1, range: 2, held: null,
+        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3,
         maskTime: 0, superType: superType, superUsed: false
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
@@ -1413,7 +1415,7 @@ function superStateText(p) {
 }
 function twoPHudHtml(label, col, p) {
   var item = p.held ? PU_NAME[p.held] : '—';
-  return '<div class="hlabel" style="color:' + col + '">' + label + '</div>' +
+  return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + '</div>' +
     '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range : 'KNOCKED OUT') + '</div>' +
     '<div class="hsub">Item (A): ' + item + '</div>' +
     '<div class="hsub">Super (X): ' + superStateText(p) + '</div>';
@@ -1604,14 +1606,24 @@ function animate() {
       }
     });
     if (twoPlayer && !transitioning) {
-      // versus round: last one standing wins
+      // versus round: last one standing wins the level, then EVERYONE moves on together
       var aliveH = humans().filter(function (p) { return p.alive; });
       var aliveBotCount = bots.filter(function (b) { return b.alive; }).length;
       if (aliveH.length === 0) {
-        endGame('The rivals win this round! Press Start to battle again');
+        endGame('The rivals win! Press Start to play again');
       } else if (aliveH.length === 1 && aliveBotCount === 0) {
-        var wname = aliveH[0] === player ? 'Player 1' : aliveH[0] === player2 ? 'Player 2' : 'Player 3';
-        endGame(wname + ' wins the battle! Press Start for a rematch');
+        transitioning = true;
+        var winner = aliveH[0];
+        winner.wins = (winner.wins || 0) + 1;
+        var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
+        showLevelMsg(wname + ' wins the round!');
+        snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
+        setTimeout(function () {
+          level++;
+          startLevel(true);
+          showLevelMsg('Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+          transitioning = false;
+        }, 1700);
       }
     } else if (!twoPlayer) {
       // level cleared?
@@ -1634,7 +1646,7 @@ function animate() {
     if (twoPlayer) {
       document.getElementById('hudTL').innerHTML = twoPHudHtml('Player 1', '#64b5f6', player);
       document.getElementById('hudTR').innerHTML = twoPHudHtml('Player 2', '#81c784', player2) +
-        '<div class="hsub" style="margin-top:4px">Rivals left: ' + aliveBots + '</div>';
+        '<div class="hsub" style="margin-top:4px">Level ' + level + ' &middot; Rivals left: ' + aliveBots + '</div>';
       if (player3) document.getElementById('hudP3').innerHTML = twoPHudHtml('Player 3', '#ea80fc', player3);
       renderer.autoClear = true;
     } else {
