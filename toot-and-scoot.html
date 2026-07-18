@@ -71,6 +71,7 @@
   }
   #hudTL { top: 14px; left: 14px; }
   #hudTR { top: 14px; right: 14px; }
+  #hudP3 { bottom: 14px; left: 14px; display: none; }
   .hlabel { font-size: 14px; letter-spacing: 2px; color: #ffd54f; text-transform: uppercase; text-shadow: 1px 1px 0 #000; }
   .hbig { font-size: 42px; line-height: 1.05; text-shadow: 3px 3px 0 #000; }
   .hsub { font-size: 13px; color: #b3e5fc; text-shadow: 1px 1px 0 #000; }
@@ -114,7 +115,8 @@
     <p style="margin:12px 0 2px">Players:</p>
     <div id="modebtns">
       <button class="hatbtn hatsel" id="modebtn1" onclick="pickMode(1, this, event)">1 player</button>
-      <button class="hatbtn" id="modebtn2" onclick="pickMode(2, this, event)">2 player split screen</button>
+      <button class="hatbtn" id="modebtn2" onclick="pickMode(2, this, event)">2 players</button>
+      <button class="hatbtn" id="modebtn3" onclick="pickMode(3, this, event)">3 players</button>
     </div>
     <p style="margin:12px 0 2px">Pick your color:</p>
     <div id="colorbtns">
@@ -174,6 +176,7 @@
     <div class="hlabel">Rivals</div>
     <div class="hbig" id="hRivals">0</div>
   </div>
+  <div class="hpanel" id="hudP3"></div>
   <div id="slots">
     <div class="slotbox" id="slotA">
       <div class="slotname" id="slotAName">&mdash;</div>
@@ -214,10 +217,15 @@ scene.fog = new THREE.Fog(0x87ceeb, 30, 70);
 
 var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
 var camera2 = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+var camera3 = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+var cameraTop = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
 function setAspects() {
-  var a = (twoPlayer ? window.innerWidth / 2 : window.innerWidth) / window.innerHeight;
-  camera.aspect = a; camera.updateProjectionMatrix();
-  camera2.aspect = a; camera2.updateProjectionMatrix();
+  // 2P = two tall halves; 3P = four quadrants (same aspect as full screen); 1P = full
+  var a = numPlayers === 2 ? (window.innerWidth / 2) / window.innerHeight : window.innerWidth / window.innerHeight;
+  [camera, camera2, camera3, cameraTop].forEach(function (cam) {
+    cam.aspect = a;
+    cam.updateProjectionMatrix();
+  });
 }
 
 var renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -341,15 +349,14 @@ var grid, crateMeshes, bombs, explosions, powerups, bots, walls, domes;
 var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
-var numPlayers = 1, twoPlayer = false, player2 = null, round2p = 0;
+var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
 var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR SPRAY' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1' };
 
 function pickMode(n, el, ev) {
   if (ev) ev.stopPropagation();
   numPlayers = n;
-  document.getElementById('modebtn1').classList.toggle('hatsel', n === 1);
-  document.getElementById('modebtn2').classList.toggle('hatsel', n === 2);
+  for (var i = 1; i <= 3; i++) document.getElementById('modebtn' + i).classList.toggle('hatsel', n === i);
 }
 
 var playerColor = 0x2979ff;
@@ -736,6 +743,7 @@ function humans() {
   var h = [];
   if (player) h.push(player);
   if (twoPlayer && player2) h.push(player2);
+  if (twoPlayer && player3) h.push(player3);
   return h;
 }
 function nearestPlayerTile(gx, gz) {
@@ -757,10 +765,11 @@ function startLevel(keepStats) {
   if (bots) bots.forEach(function (b) { scene.remove(b.mesh); });
   if (player && player.mesh) scene.remove(player.mesh);
   if (player2 && player2.mesh) scene.remove(player2.mesh);
+  if (player3 && player3.mesh) scene.remove(player3.mesh);
   if (walls) walls.forEach(function (w) { scene.remove(w.mesh); });
   if (domes) domes.forEach(function (d) { scene.remove(d.mesh); });
   bombs = []; explosions = []; powerups = []; bots = []; walls = []; domes = [];
-  twoPlayer = numPlayers === 2;
+  twoPlayer = numPlayers >= 2;
   setAspects();
   buildWorld();
 
@@ -801,10 +810,30 @@ function startLevel(keepStats) {
       maskTime: 0, superType: superType, superUsed: false
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
+    if (numPlayers >= 3) {
+      var c3 = tileCenter(levelSpawns[2][0], levelSpawns[2][1]);
+      var p3color = playerColor === 0xd500f9 ? 0xff9100 : 0xd500f9;
+      var p3hat = playerHat === 'tproll' ? 'party' : 'tproll';
+      player3 = {
+        x: c3.x, z: c3.z, alive: true,
+        mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
+        yaw: 2.5, pitch: 0.55,
+        speed: 5, maxBombs: 1, range: 2, held: null,
+        maskTime: 0, superType: superType, superUsed: false
+      };
+      player3.mesh.position.set(c3.x, 0, c3.z);
+      cameraTop.position.set(COLS * TS / 2, 27, ROWS * TS / 2 + 7);
+      cameraTop.lookAt(COLS * TS / 2, 0, ROWS * TS / 2);
+    } else {
+      player3 = null;
+    }
+    document.getElementById('hudP3').style.display = numPlayers >= 3 ? 'block' : 'none';
     document.getElementById('slots').style.display = 'none';
     document.getElementById('hudBL').style.display = 'none';
   } else {
     player2 = null;
+    player3 = null;
+    document.getElementById('hudP3').style.display = 'none';
     document.getElementById('hudTL').innerHTML = '<div class="hlabel">Level</div><div class="hbig" id="hLevel">1</div><div class="hsub" id="hDiff">Easy</div><div class="hsub" id="hScore" style="color:#ffd54f">Score 0</div>';
     document.getElementById('hudTR').innerHTML = '<div class="hlabel">Rivals</div><div class="hbig" id="hRivals">0</div>';
     document.getElementById('slots').style.display = 'flex';
@@ -813,7 +842,7 @@ function startLevel(keepStats) {
   hudroot.style.display = 'block';
   maskoverlay.style.display = 'none';
 
-  var spawns = levelSpawns.slice(twoPlayer ? 2 : 1);
+  var spawns = levelSpawns.slice(numPlayers);
   var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
   for (var i = 0; i < levelParams.botCount; i++) {
     var b = makeBot(spawns[i][0], spawns[i][1], botDefs[i][0], botDefs[i][1]);
@@ -1399,13 +1428,18 @@ function animate() {
 
   // gamepads: with two controllers P1 gets the first and P2 the second;
   // with one controller in 2P mode, P1 takes keyboard+mouse and P2 gets the pad
-  var pad = null, p1pad = null, p2pad = null;
+  var pad = null, p1pad = null, p2pad = null, p3pad = null;
   if (navigator.getGamepads) {
     var pads = navigator.getGamepads(), cps = [];
     for (var gi = 0; gi < pads.length; gi++) if (pads[gi] && pads[gi].connected) cps.push(pads[gi]);
     pad = cps[0] || null;
-    if (twoPlayer && cps.length === 1) { p2pad = cps[0]; }
-    else { p1pad = cps[0] || null; p2pad = cps[1] || null; }
+    if (cps.length >= numPlayers) {
+      // enough controllers for everyone
+      p1pad = cps[0] || null; p2pad = cps[1] || null; p3pad = cps[2] || null;
+    } else {
+      // one short: P1 falls back to keyboard+mouse, pads go to P2 and P3
+      p2pad = cps[0] || null; p3pad = cps[1] || null;
+    }
   }
   if (pad) {
     // + button: start from the title, or open/close the pause menu in-game
@@ -1452,6 +1486,10 @@ function animate() {
     if (twoPlayer && player2 && player2.alive) {
       controlHuman(player2, p2pad, false, dt);
       placeCam(camera2, player2);
+    }
+    if (twoPlayer && player3 && player3.alive) {
+      controlHuman(player3, p3pad, false, dt);
+      placeCam(camera3, player3);
     }
 
     // bombs
@@ -1572,7 +1610,8 @@ function animate() {
       if (aliveH.length === 0) {
         endGame('The rivals win this round! Press Start to battle again');
       } else if (aliveH.length === 1 && aliveBotCount === 0) {
-        endGame((aliveH[0] === player ? 'Player 1' : 'Player 2') + ' wins the battle! Press Start for a rematch');
+        var wname = aliveH[0] === player ? 'Player 1' : aliveH[0] === player2 ? 'Player 2' : 'Player 3';
+        endGame(wname + ' wins the battle! Press Start for a rematch');
       }
     } else if (!twoPlayer) {
       // level cleared?
@@ -1596,6 +1635,7 @@ function animate() {
       document.getElementById('hudTL').innerHTML = twoPHudHtml('Player 1', '#64b5f6', player);
       document.getElementById('hudTR').innerHTML = twoPHudHtml('Player 2', '#81c784', player2) +
         '<div class="hsub" style="margin-top:4px">Rivals left: ' + aliveBots + '</div>';
+      if (player3) document.getElementById('hudP3').innerHTML = twoPHudHtml('Player 3', '#ea80fc', player3);
       renderer.autoClear = true;
     } else {
     document.getElementById('hLevel').textContent = level;
@@ -1640,7 +1680,16 @@ function animate() {
     }
   }
 
-  if (twoPlayer && player2 && running) {
+  if (twoPlayer && player3 && running) {
+    // 3 players: four quadrants — P1, P2, P3, and a bird's-eye view of the arena
+    var qw = window.innerWidth / 2, qh = window.innerHeight / 2;
+    renderer.setScissorTest(true);
+    renderer.setScissor(0, qh, qw, qh);  renderer.setViewport(0, qh, qw, qh);  renderer.render(scene, camera);
+    renderer.setScissor(qw, qh, qw, qh); renderer.setViewport(qw, qh, qw, qh); renderer.render(scene, camera2);
+    renderer.setScissor(0, 0, qw, qh);   renderer.setViewport(0, 0, qw, qh);   renderer.render(scene, camera3);
+    renderer.setScissor(qw, 0, qw, qh);  renderer.setViewport(qw, 0, qw, qh);  renderer.render(scene, cameraTop);
+    renderer.setScissorTest(false);
+  } else if (twoPlayer && player2 && running) {
     var hw = window.innerWidth / 2, hh = window.innerHeight;
     renderer.setScissorTest(true);
     renderer.setScissor(0, 0, hw, hh);
