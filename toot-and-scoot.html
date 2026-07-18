@@ -23,6 +23,14 @@
   }
   .hatbtn:hover { background: #4a5590; }
   .hatbtn.hatsel { border-color: #ffd54f; background: #4a5590; }
+  .hatbtn.focus, .btn.focus { outline: 4px solid #fff; outline-offset: 2px; }
+  .initbox {
+    width: 58px; height: 70px; font-size: 44px; font-weight: bold; color: #fff;
+    background: #2c3450; border: 4px solid rgba(255,255,255,0.4); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #scoreboard { margin: 10px 0 4px; font-size: 17px; color: #ffd54f; }
+  .scorerow { font-family: 'Courier New', monospace; font-size: 17px; color: #fff; }
   #levelmsg {
     position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
     color: #ffd54f; font-size: 46px; font-weight: bold; text-shadow: 0 2px 6px #000;
@@ -91,6 +99,7 @@
 <div id="overlay">
   <h1>Toot and Scoot</h1>
   <div id="bigmsg"></div>
+  <div id="scoreboard"></div>
   <p>You're in the maze with your rivals: Sir Toots-a-Lot, Stinky Pete, Windy Wendy, and worse. Out-toot them all!</p>
   <p>Move: W A S D &nbsp;&middot;&nbsp; Turn camera: mouse &nbsp;&middot;&nbsp; Drop a fart: Space or click</p>
   <p>Controller: left stick = move &nbsp;&middot;&nbsp; right stick = camera &nbsp;&middot;&nbsp; B or trigger = fart &nbsp;&middot;&nbsp; A = use power-up</p>
@@ -107,6 +116,13 @@
       <button class="hatbtn hatsel" id="modebtn1" onclick="pickMode(1, this, event)">1 player</button>
       <button class="hatbtn" id="modebtn2" onclick="pickMode(2, this, event)">2 player split screen</button>
     </div>
+    <p style="margin:12px 0 2px">Pick your color:</p>
+    <div id="colorbtns">
+      <button class="hatbtn hatsel" onclick="pickColor(0x2979ff, this, event)" style="color:#64b5f6">Blue</button>
+      <button class="hatbtn" onclick="pickColor(0xe53935, this, event)" style="color:#ef9a9a">Red</button>
+      <button class="hatbtn" onclick="pickColor(0x00897b, this, event)" style="color:#80cbc4">Teal</button>
+      <button class="hatbtn" onclick="pickColor(0xd500f9, this, event)" style="color:#ea80fc">Magenta</button>
+    </div>
     <p style="margin:12px 0 2px">Pick your hat:</p>
     <div id="hatbtns">
       <button class="hatbtn hatsel" onclick="pickHat('cowboy', this, event)">Cowboy hat</button>
@@ -114,10 +130,23 @@
       <button class="hatbtn" onclick="pickHat('cap', this, event)">Ball cap</button>
       <button class="hatbtn" onclick="pickHat('tproll', this, event)">TP roll</button>
     </div>
-    <button class="btn" style="background:#43a047" onclick="pickDiff(0)">Easy</button>
-    <button class="btn" style="background:#fb8c00" onclick="pickDiff(1)">Medium</button>
-    <button class="btn" style="background:#e53935" onclick="pickDiff(2)">Hard</button>
+    <div id="startbtns">
+      <button class="btn" style="background:#43a047" onclick="pickDiff(0)">Easy</button>
+      <button class="btn" style="background:#fb8c00" onclick="pickDiff(1)">Medium</button>
+      <button class="btn" style="background:#e53935" onclick="pickDiff(2)">Hard</button>
+    </div>
+    <p style="font-size:15px; margin:6px 0 0">Controller: d-pad or stick moves the menu, A picks</p>
   </div>
+</div>
+<div id="initials" class="menu" style="display:none">
+  <h2>New high score!</h2>
+  <div id="initScore" style="font-size:19px; margin-bottom:10px; color:#ffd54f"></div>
+  <div style="display:flex; gap:14px; justify-content:center; margin:12px 0">
+    <div class="initbox" id="init0">A</div>
+    <div class="initbox" id="init1">A</div>
+    <div class="initbox" id="init2">A</div>
+  </div>
+  <p style="font-size:15px">Up/down = change letter &middot; A (or Enter) = next &middot; or just type your initials</p>
 </div>
 <svg id="maskoverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
   <defs>
@@ -323,6 +352,100 @@ function pickMode(n, el, ev) {
   document.getElementById('modebtn2').classList.toggle('hatsel', n === 2);
 }
 
+var playerColor = 0x2979ff;
+function pickColor(hex, el, ev) {
+  if (ev) ev.stopPropagation();
+  playerColor = hex;
+  var cb = document.querySelectorAll('#colorbtns .hatbtn');
+  for (var i = 0; i < cb.length; i++) cb[i].classList.remove('hatsel');
+  el.classList.add('hatsel');
+}
+
+// ---- title menu controller navigation ----
+var MENU_ROWS = ['modebtns', 'colorbtns', 'hatbtns', 'startbtns'];
+var mRow = 3, mCol = 0;
+function titleButtons(rid) {
+  return Array.prototype.slice.call(document.getElementById(rid).querySelectorAll('button'));
+}
+function renderTitleFocus() {
+  MENU_ROWS.forEach(function (rid, ri) {
+    titleButtons(rid).forEach(function (b, ci) {
+      b.classList.toggle('focus', ri === mRow && ci === mCol);
+    });
+  });
+}
+function titleNav(dx, dy) {
+  if (dy) {
+    mRow = (mRow + dy + MENU_ROWS.length) % MENU_ROWS.length;
+    mCol = Math.min(mCol, titleButtons(MENU_ROWS[mRow]).length - 1);
+  }
+  if (dx) {
+    var n = titleButtons(MENU_ROWS[mRow]).length;
+    mCol = (mCol + dx + n) % n;
+  }
+  renderTitleFocus();
+}
+function titleActivate() {
+  var b = titleButtons(MENU_ROWS[mRow])[mCol];
+  if (b) b.click();
+}
+
+// ---- persistent leaderboard (browser local storage) ----
+var initialsActive = false, initLetters = ['A', 'A', 'A'], initSlot = 0, pendingScore = null;
+function loadScores() {
+  try { return JSON.parse(localStorage.getItem('tootScootScores')) || []; } catch (e) { return []; }
+}
+function scoreQualifies(s) {
+  var sc = loadScores();
+  return sc.length < 10 || s > sc[sc.length - 1].score;
+}
+function renderScoreboard() {
+  var s = loadScores().slice(0, 5);
+  var el = document.getElementById('scoreboard');
+  if (!s.length) { el.innerHTML = ''; return; }
+  el.innerHTML = 'HIGH SCORES<br>' + s.map(function (r, i) {
+    return '<span class="scorerow">' + (i + 1) + '. ' + r.initials + ' ' + ('' + r.score) + ' pts (level ' + r.level + ')</span>';
+  }).join('<br>');
+}
+function renderInitials() {
+  for (var i = 0; i < 3; i++) {
+    var el = document.getElementById('init' + i);
+    el.textContent = initLetters[i];
+    el.style.borderColor = i === initSlot ? '#ffd54f' : 'rgba(255,255,255,0.4)';
+  }
+}
+function showInitials(sc) {
+  initialsActive = true;
+  initLetters = ['A', 'A', 'A'];
+  initSlot = 0;
+  pendingScore = sc;
+  document.getElementById('initScore').textContent = sc.score + ' points — level ' + sc.level;
+  document.getElementById('initials').style.display = 'block';
+  renderInitials();
+  snd(700, 0.2, 'sine'); snd(900, 0.3, 'sine');
+}
+function cycleLetter(d) {
+  var A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  initLetters[initSlot] = A[(A.indexOf(initLetters[initSlot]) + d + 26) % 26];
+  renderInitials();
+}
+function advanceSlot() {
+  if (initSlot < 2) { initSlot++; renderInitials(); }
+  else finishInitials();
+}
+function finishInitials() {
+  initialsActive = false;
+  document.getElementById('initials').style.display = 'none';
+  var sc = loadScores();
+  sc.push({ initials: initLetters.join(''), score: pendingScore.score, level: pendingScore.level });
+  sc.sort(function (a, b) { return b.score - a.score; });
+  try { localStorage.setItem('tootScootScores', JSON.stringify(sc.slice(0, 10))); } catch (e) {}
+  renderScoreboard();
+  overlay.style.display = 'flex';
+  diffbtns.style.display = 'block';
+  renderTitleFocus();
+}
+
 function pickHat(t, el, ev) {
   if (ev) ev.stopPropagation();
   playerHat = t;
@@ -337,7 +460,8 @@ var settingsEl = document.getElementById('settingsmenu');
 
 function pickDiff(d) {
   difficulty = d;
-  renderer.domElement.requestPointerLock();
+  startGame();
+  try { renderer.domElement.requestPointerLock(); } catch (e) {}
 }
 
 function menuButtons() {
@@ -595,12 +719,13 @@ function startLevel(keepStats) {
   var c = tileCenter(1, 1);
   var prev = keepStats && !twoPlayer && player ? player : null;
   player = {
-    x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(0x2979ff, playerHat), baseColor: 0x2979ff,
+    x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(playerColor, playerHat), baseColor: playerColor,
     yaw: Math.PI + 0.6, pitch: 0.55,
     speed:    prev ? prev.speed    : 5,
     maxBombs: prev ? prev.maxBombs : 1,
     range:    prev ? prev.range    : 2,
     held:     prev ? prev.held     : null,
+    score:    prev ? prev.score    : 0,
     maskTime: 0,
     superType: superType,
     superUsed: false
@@ -620,7 +745,7 @@ function startLevel(keepStats) {
     document.getElementById('hudBL').style.display = 'none';
   } else {
     player2 = null;
-    document.getElementById('hudTL').innerHTML = '<div class="hlabel">Level</div><div class="hbig" id="hLevel">1</div><div class="hsub" id="hDiff">Easy</div>';
+    document.getElementById('hudTL').innerHTML = '<div class="hlabel">Level</div><div class="hbig" id="hLevel">1</div><div class="hsub" id="hDiff">Easy</div><div class="hsub" id="hScore" style="color:#ffd54f">Score 0</div>';
     document.getElementById('hudTR').innerHTML = '<div class="hlabel">Rivals</div><div class="hbig" id="hRivals">0</div>';
     document.getElementById('slots').style.display = 'flex';
     document.getElementById('hudBL').style.display = 'flex';
@@ -800,6 +925,7 @@ function explode(b) {
       if (grid[z][x] === 2) {
         removeCrate(x, z);
         if (Math.random() < 0.35) drops.push([x, z]);
+        if (b.owner === player && !twoPlayer) player.score += 10;   // 10 points per roll destroyed
         // blast punches straight through crates — same length every direction
       }
     }
@@ -809,7 +935,7 @@ function explode(b) {
     var m = new THREE.Mesh(boomGeo, matBoom);
     m.position.set(c.x, TS * 0.45, c.z);
     scene.add(m);
-    explosions.push({ gx: t[0], gz: t[1], timer: 0.45, mesh: m });
+    explosions.push({ gx: t[0], gz: t[1], timer: 0.45, mesh: m, owner: b.owner });
     for (var i = powerups.length - 1; i >= 0; i--) {
       if (powerups[i].gx === t[0] && powerups[i].gz === t[1]) {
         scene.remove(powerups[i].mesh);
@@ -1066,7 +1192,7 @@ function usePowerupFor(p) {
 var locked = false;
 var keys = {};
 var padBombPrev = false, padStartPrev = false, padUsePrev = false;
-var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false;
+var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false, padLtPrev = false, padRtPrev = false;
 
 overlay.addEventListener('click', function () {
   renderer.domElement.requestPointerLock();
@@ -1080,9 +1206,10 @@ document.addEventListener('pointerlockchange', function () {
   } else {
     if (running && !gameOver) {
       openMenu();
-    } else {
+    } else if (!initialsActive) {
       overlay.style.display = 'flex';
       diffbtns.style.display = 'block';
+      renderTitleFocus();
     }
   }
 });
@@ -1093,6 +1220,27 @@ document.addEventListener('mousemove', function (e) {
   player.pitch = Math.max(0.25, Math.min(1.25, player.pitch + e.movementY * sens));
 });
 document.addEventListener('keydown', function (e) {
+  if (initialsActive) {
+    if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+      initLetters[initSlot] = e.key.toUpperCase();
+      if (initSlot < 2) initSlot++;
+      renderInitials();
+    }
+    else if (e.code === 'ArrowUp') cycleLetter(1);
+    else if (e.code === 'ArrowDown') cycleLetter(-1);
+    else if (e.code === 'ArrowLeft') { if (initSlot > 0) initSlot--; renderInitials(); }
+    else if (e.code === 'ArrowRight') advanceSlot();
+    else if (e.code === 'Enter') { if (initSlot === 2) finishInitials(); else advanceSlot(); }
+    else if (e.code === 'Backspace') { if (initSlot > 0) initSlot--; renderInitials(); }
+    return;
+  }
+  if ((!running || gameOver) && overlay.style.display !== 'none') {
+    if (e.code === 'ArrowUp') { titleNav(0, -1); return; }
+    if (e.code === 'ArrowDown') { titleNav(0, 1); return; }
+    if (e.code === 'ArrowLeft') { titleNav(-1, 0); return; }
+    if (e.code === 'ArrowRight') { titleNav(1, 0); return; }
+    if (e.code === 'Enter') { titleActivate(); return; }
+  }
   if (menuOpen) {
     var btns = menuButtons();
     if (e.code === 'ArrowUp' || e.code === 'KeyW') { menuIndex = (menuIndex + btns.length - 1) % btns.length; renderMenu(); }
@@ -1115,8 +1263,13 @@ function endGame(text) {
   bigmsg.textContent = text;
   setTimeout(function () {
     if (document.pointerLockElement) document.exitPointerLock();
-    overlay.style.display = 'flex';
-    diffbtns.style.display = 'block';
+    if (!twoPlayer && player && player.score > 0 && scoreQualifies(player.score)) {
+      showInitials({ score: player.score, level: level });
+    } else {
+      overlay.style.display = 'flex';
+      diffbtns.style.display = 'block';
+      renderTitleFocus();
+    }
   }, 600);
 }
 
@@ -1209,15 +1362,27 @@ function animate() {
     var aNow = (pad.buttons[0] && pad.buttons[0].pressed) || (pad.buttons[1] && pad.buttons[1].pressed);
     var upNow = (pad.buttons[12] && pad.buttons[12].pressed) || pad.axes[1] < -0.5;
     var dnNow = (pad.buttons[13] && pad.buttons[13].pressed) || pad.axes[1] > 0.5;
-    if (menuOpen) {
+    var ltNow = (pad.buttons[14] && pad.buttons[14].pressed) || pad.axes[0] < -0.5;
+    var rtNow = (pad.buttons[15] && pad.buttons[15].pressed) || pad.axes[0] > 0.5;
+    if (initialsActive) {
+      if (upNow && !padUpPrev) cycleLetter(1);
+      if (dnNow && !padDnPrev) cycleLetter(-1);
+      if (ltNow && !padLtPrev) { if (initSlot > 0) initSlot--; renderInitials(); }
+      if (rtNow && !padRtPrev) advanceSlot();
+      if (aNow && !padAPrev) advanceSlot();
+    } else if (menuOpen) {
       var mbtns = menuButtons();
       if (upNow && !padUpPrev) { menuIndex = (menuIndex + mbtns.length - 1) % mbtns.length; renderMenu(); }
       if (dnNow && !padDnPrev) { menuIndex = (menuIndex + 1) % mbtns.length; renderMenu(); }
       if (aNow && !padAPrev) menuAction(mbtns[menuIndex].dataset.act, true);
-    } else if ((!running || gameOver) && aNow && !padAPrev) {
-      startGame();
+    } else if (!running || gameOver) {
+      if (upNow && !padUpPrev) titleNav(0, -1);
+      if (dnNow && !padDnPrev) titleNav(0, 1);
+      if (ltNow && !padLtPrev) titleNav(-1, 0);
+      if (rtNow && !padRtPrev) titleNav(1, 0);
+      if (aNow && !padAPrev) titleActivate();
     }
-    padUpPrev = upNow; padDnPrev = dnNow; padAPrev = aNow;
+    padUpPrev = upNow; padDnPrev = dnNow; padAPrev = aNow; padLtPrev = ltNow; padRtPrev = rtNow;
   }
 
   if (running && !menuOpen && (locked || pad)) {
@@ -1317,10 +1482,15 @@ function animate() {
       }
       var tiles = [[bot.gx, bot.gz]];
       if (bot.moving) tiles.push([bot.tx, bot.tz]);
-      if (tiles.some(function (t) { return explosionAt(t[0], t[1]); })) {
+      var hitE = null;
+      tiles.forEach(function (t) {
+        explosions.forEach(function (e2) { if (e2.gx === t[0] && e2.gz === t[1]) hitE = e2; });
+      });
+      if (hitE) {
         bot.alive = false;
         scene.remove(bot.mesh);
         snd(120, 0.5, 'triangle');
+        if (!twoPlayer && hitE.owner === player) player.score += 100;   // 100 points per rival YOU gassed
       }
     });
     // player hit?
@@ -1350,7 +1520,8 @@ function animate() {
       // level cleared?
       if (player.alive && !transitioning && bots.length && bots.every(function (b) { return !b.alive; })) {
         transitioning = true;
-        showLevelMsg('Level ' + level + ' cleared!');
+        player.score += 500;   // 500 point bonus for winning the level
+        showLevelMsg('Level ' + level + ' cleared! +500');
         snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
         setTimeout(function () {
           level++;
@@ -1371,6 +1542,7 @@ function animate() {
     } else {
     document.getElementById('hLevel').textContent = level;
     document.getElementById('hDiff').textContent = ['Easy', 'Medium', 'Hard'][difficulty];
+    document.getElementById('hScore').textContent = 'Score ' + player.score;
     document.getElementById('hRivals').textContent = aliveBots;
     document.getElementById('hGas').textContent = player.maxBombs;
     document.getElementById('hBlast').textContent = player.range;
@@ -1428,6 +1600,8 @@ function animate() {
 buildWorld();
 camera.position.set(COLS * TS / 2, 22, ROWS * TS + 10);
 camera.lookAt(COLS * TS / 2, 0, ROWS * TS / 2);
+renderScoreboard();
+renderTitleFocus();
 animate();
 
 window.addEventListener('resize', function () {
