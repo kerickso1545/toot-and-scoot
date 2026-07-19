@@ -1555,7 +1555,7 @@ function controlHuman(p, pd, kb, dt) {
     if (Math.abs(ly) > 0.2) fwd -= ly;
   }
   var len = Math.max(1, Math.hypot(fwd, str));
-  var spd = p.speed * (p.beansTime > 0 ? 2 : 1);   // bean power: double speed, way faster than your own farts
+  var spd = p.speed * (p.beansTime > 0 || p.reviveTime > 0 ? 2 : 1);   // beans and extra-life revival: double speed
   var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * spd;
   var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * spd;
   var stuck = overlappingSolids(p.x, p.z);
@@ -1795,6 +1795,7 @@ function animate() {
     // superpower cooldowns tick back toward ready
     humans().forEach(function (p) {
       if (p.superCd > 0) p.superCd = Math.max(0, p.superCd - dt);
+      if (p.reviveTime > 0) p.reviveTime = Math.max(0, p.reviveTime - dt);
     });
     // bean power: leave a little fart on every tile you cross
     humans().forEach(function (p) {
@@ -1940,8 +1941,10 @@ function animate() {
       if (explosionAt(t.x, t.z)) {
         if (p.lives > 0) {
           // the rainbow saves you: spend a life, flash invincible for 2 seconds
+          // with bean-style double speed to escape the danger
           p.lives--;
           p.maskTime = 2;
+          p.reviveTime = 2;
           showLevelMsg((twoPlayer ? 'Player ' + (hIdx + 1) : 'You') + ' used an extra life!');
           snd(784, 0.12, 'sine'); snd(523, 0.2, 'sine');
           return;
