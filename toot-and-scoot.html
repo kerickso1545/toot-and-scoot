@@ -1493,8 +1493,9 @@ function controlHuman(p, pd, kb, dt) {
     if (Math.abs(ly) > 0.2) fwd -= ly;
   }
   var len = Math.max(1, Math.hypot(fwd, str));
-  var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * p.speed;
-  var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * p.speed;
+  var spd = p.speed * (p.beansTime > 0 ? 1.5 : 1);   // bean power makes you faster than your own farts
+  var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * spd;
+  var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * spd;
   var stuck = overlappingSolids(p.x, p.z);
   var nx = p.x + vx * dt;
   if (!collides(nx, p.z, stuck)) p.x = nx;
