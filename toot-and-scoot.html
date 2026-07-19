@@ -172,7 +172,7 @@
   <p><b>Power-ups</b> (you can hold only ONE — press A to use it; grab a second before using the first and it's wasted):<br>
   <b style="color:#ffab40">Orange</b> = more gas (more farts at once) &middot; <b style="color:#ff5252">Red</b> = bigger blast &middot;
   <b style="color:#66bb6a">Green</b> = trap wall (blocks a tile for 10 seconds — fart + wall = trap!) &middot;
-  <b style="color:#eceff1">White</b> = air spray (makes any fart near you vanish before it spreads) &middot;
+  <b style="color:#eceff1">White</b> = air freshener (makes any fart near you vanish before it spreads) &middot;
   <b style="color:#ce93d8">Purple</b> = Turbo Toot (face someone and fire — blinds them for 5 seconds!)</p>
   <p><b>Legendary finds</b> (indestructible — blasts can't destroy them):<br>
   <b style="color:#bcaaa4">The can of beans</b> (10% of drops) — eat it on the spot: for 6 seconds you run at double speed and every tile you cross leaves a fart behind you.<br>
@@ -403,7 +403,7 @@ var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
-var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR SPRAY', turbo: 'TURBO TOOT' };
+var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 
 function pickMode(n, el, ev) {
