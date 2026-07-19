@@ -1835,7 +1835,7 @@ function animate() {
         p.trailTile = bt;
       }
     });
-    // holding an Extalife makes your avatar shimmer rainbow
+    // holding an Extra Life makes your avatar shimmer rainbow
     humans().forEach(function (p) {
       if (!p.alive || p.maskTime > 0) return;   // the gas mask gray takes priority
       if (p.lives > 0) p.mesh.userData.mat.color.setHSL((now / 700) % 1, 0.9, 0.55);
