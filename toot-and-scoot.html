@@ -115,7 +115,7 @@
   <p>Power-ups: <b style="color:#ffab40">orange = more gas</b> &middot; <b style="color:#ff5252">red = bigger blast</b> &middot; <b style="color:#40c4ff">blue = Super Scoot</b> &middot; <b style="color:#66bb6a">green = trap wall</b> &middot; <b style="color:#eceff1">white = air spray</b> &middot; <b style="color:#ce93d8">purple = Turbo Toot</b></p>
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
-  <p>Superpower on X (or Q): a different one every level, one use each! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
+  <p>Superpower on X (or Q): a different one every level, with a 30 second cooldown between uses! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
   <p>Clear every rival to move up a level — new maze, more rivals, and they get smarter and faster!</p>
   <div id="diffbtns">
@@ -809,7 +809,7 @@ function startLevel(keepStats) {
     wins:     prevW1,
     maskTime: 0,
     superType: superType,
-    superUsed: false
+    superCd: 0
   };
   player.mesh.position.set(c.x, 0, c.z);
   if (twoPlayer) {
@@ -819,7 +819,7 @@ function startLevel(keepStats) {
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
       speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2,
-      maskTime: 0, superType: superType, superUsed: false
+      maskTime: 0, superType: superType, superCd: 0
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
     if (numPlayers >= 3) {
@@ -831,7 +831,7 @@ function startLevel(keepStats) {
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
         speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3,
-        maskTime: 0, superType: superType, superUsed: false
+        maskTime: 0, superType: superType, superCd: 0
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
       cameraTop.position.set(COLS * TS / 2, 27, ROWS * TS / 2 + 7);
@@ -1269,10 +1269,10 @@ function dutchOven(p) {
 
 function useSuperFor(p) {
   if (!running || !p || !p.alive) return;
-  if (p.superUsed || p.maskTime > 0) { snd(110, 0.15, 'square'); return; }
+  if (p.superCd > 0 || p.maskTime > 0) { snd(110, 0.15, 'square'); return; }
   var t = p.superType;
   if (t === 'mask') {
-    p.superUsed = true;
+    p.superCd = 30;
     p.maskTime = 8;
     if (!twoPlayer) {
       maskoverlay.style.display = 'block';
@@ -1283,11 +1283,11 @@ function useSuperFor(p) {
   } else if (t === 'sbd') {
     var pt = tileOf(p);
     if (bombAt(pt.x, pt.z)) { snd(110, 0.15, 'square'); return; }
-    p.superUsed = true;
+    p.superCd = 30;
     placeBomb(pt.x, pt.z, p.range + 1, p, { hidden: true });
   } else if (t === 'dutch') {
-    if (!dutchOven(p)) { snd(110, 0.15, 'square'); return; }   // no rival in range — keep it
-    p.superUsed = true;
+    if (!dutchOven(p)) { snd(110, 0.15, 'square'); return; }   // no rival in range — no cooldown either
+    p.superCd = 30;
     snd(240, 0.3, 'sine');
   }
 }
@@ -1494,7 +1494,7 @@ function placeCam(cam, p) {
 }
 
 function superStateText(p) {
-  return p.maskTime > 0 ? Math.ceil(p.maskTime) + 's' : p.superUsed ? 'used' : SUPER_SHORT[p.superType];
+  return p.maskTime > 0 ? Math.ceil(p.maskTime) + 's' : p.superCd > 0 ? 'wait ' + Math.ceil(p.superCd) + 's' : SUPER_SHORT[p.superType];
 }
 function twoPHudHtml(label, col, p) {
   var item = p.held ? PU_NAME[p.held] : '—';
@@ -1607,6 +1607,10 @@ function animate() {
       } else {
         el.style.display = 'none';
       }
+    });
+    // superpower cooldowns tick back toward ready
+    humans().forEach(function (p) {
+      if (p.superCd > 0) p.superCd = Math.max(0, p.superCd - dt);
     });
     // gas mask timers: gray while worn, blinks before wearing off
     humans().forEach(function (p) {
@@ -1786,8 +1790,8 @@ function animate() {
       slotX.style.borderColor = '#66bb6a';
       slotX.style.boxShadow = '0 0 16px #66bb6a';
       slotX.style.opacity = '1';
-    } else if (player.superUsed) {
-      slotXName.textContent = 'USED';
+    } else if (player.superCd > 0) {
+      slotXName.textContent = Math.ceil(player.superCd) + 's';
       slotXName.style.color = '#90a4ae';
       slotX.style.borderColor = '#607d8b';
       slotX.style.boxShadow = 'none';
