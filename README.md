@@ -4,21 +4,69 @@ Games designed by Otto, built with Claude.
 
 ## Toot and Scoot (`toot-and-scoot.html`)
 
-A 3D fart-battle arena game. Open the file in any browser (needs internet the
-first time to load the Three.js library).
+A 3D fart-battle arena game in a bathroom-themed maze. Open the file in any
+browser (needs internet the first time to load the Three.js library). Best
+played with Bluetooth/USB controllers; keyboard + mouse also fully supported.
 
-- Third-person 3D maze battle in a bathroom arena (porcelain tile, toilet paper roll crates)
-- 1 player (levels, rising difficulty) or 2 player split screen versus
-- Controller support (Bluetooth/USB): left stick move, right stick camera,
-  B/trigger = fart, A = use power-up, X = superpower, + = pause menu
-- Keyboard: WASD + mouse, Space = fart, E = power-up, Q = superpower, Esc = pause
-- Power-ups: extra gas, bigger blast, Super Scoot, trap wall, air spray
-- Superpowers (rotate each level, one use): Gas Mask, Silent But Deadly, Dutch Oven
-- Rivals with their own hats and signature fart sounds: Sir Toots-a-Lot,
-  Stinky Pete, Windy Wendy, Princess Poot, Gassy Gus, Captain Cheeks
-- Difficulty: Easy / Medium / Hard, plus hat picker
+### Modes
+- **1 player** — level campaign with rising difficulty, scoring, and a
+  persistent local leaderboard (top 10, classic 3-initial entry)
+- **2 player split screen** and **3 player quadrant view** (third-person
+  cameras; the 3P fourth quadrant is a live bird's-eye view) — battle royale
+  with rival bots mixed in; when someone wins the round, everyone advances to
+  the next level together; per-player win tally and score
+- Knocked-out players **spectate** (A cycles who you watch)
+
+### Controls
+| Action | Controller | Keyboard |
+|---|---|---|
+| Move | left stick | WASD |
+| Camera | right stick | mouse |
+| Drop a fart | B / right trigger | Space or click |
+| Use held power-up | A | E |
+| Superpower | X | Q |
+| Sprint | left-stick click / LT | Shift |
+| Pause menu | + / Start | Esc |
+| Menus | d-pad + A | arrows + Enter |
+
+### Core mechanics
+- Farts linger, then spread fast in four directions; blasts punch through
+  crates but stop at walls
+- **Power-ups** (hold one, A to use): Extra Gas, Big Blast, Trap Wall,
+  Air Freshener, Turbo Toot (blinds a victim for 5 s — pitch black screen for
+  human victims)
+- **Legendary finds** (indestructible): Can of Beans (10% of drops — 6 s fart
+  trail at double speed), rainbow **Extra Life** (2% — auto-revive with 2 s
+  invincible double-speed escape; avatar shimmers rainbow while carried)
+- **Superpowers** (X, one per level, rotating): Gas Mask, Silent But Deadly,
+  Dutch Oven
+- **Sprint + stamina**: 100 stamina, sprint drains 10/s, refills at rest;
+  run dry and you can't sprint until it recovers
+- **Six maze shapes** cycle per level (Classic, Octagon, Circle, Triangle,
+  Diamond, Open floor) with varied pillar patterns; generation guarantees
+  full connectivity (no sealed pockets)
+- **Boss every 10th level**: The Big Stinker — 1000 HP, 100 damage per blast,
+  health bar, boss arena
+- **Six rivals** with signature hats and synthesized fart voices; smarter,
+  faster, and more numerous as levels climb
+- **Scoring**: 10 per crate, 100 per rival, 200 per player KO, 500 per
+  level/round win, boss hits 100 each + 1000 bonus
+- HUD: kart-racer style panels, item boxes with button labels, minimap
+  (1P/2P), stamina bar, boss bar
+
+### Tech notes
+- Single self-contained HTML file; Three.js r128 from CDN; Web Audio API for
+  all sound (synthesized fart voices per character); Gamepad API;
+  localStorage for the leaderboard
+- Bathroom theme drawn procedurally in code (canvas textures) — porcelain
+  tile, toilet-paper-roll crates, frosted-glass trap walls
 
 ## Older prototypes
 
 - `boom-bots-arena.html` — the original 2D top-down bomb arena
-- `ottos-block-world.html` — first-person 3D block building demo (Minecraft-style)
+- `ottos-block-world.html` — first-person 3D block building demo
+
+## Development
+
+Built iteratively in Claude Cowork sessions — Otto designs, Claude implements.
+See `activitylog.md` and the git history for the feature-by-feature story.
