@@ -124,6 +124,12 @@
   }
   .chip i { width: 15px; height: 15px; border-radius: 50%; display: inline-block; border: 2px solid rgba(255,255,255,0.7); }
   .chip b { font-size: 22px; }
+  .pmsg {
+    position: fixed; z-index: 6; pointer-events: none; display: none;
+    transform: translateX(-50%); text-align: center;
+    color: #ffd54f; font-family: 'Arial Black', Arial, sans-serif; font-size: 19px;
+    text-shadow: 2px 2px 0 #000;
+  }
 </style>
 </head>
 <body>
@@ -154,10 +160,11 @@
       <button class="hatbtn" onclick="pickHat('tproll', this, event)">TP roll</button>
     </div>
     <div id="startbtns">
-      <button class="btn" style="background:#43a047" onclick="pickDiff(0)">Easy</button>
-      <button class="btn" style="background:#fb8c00" onclick="pickDiff(1)">Medium</button>
-      <button class="btn" style="background:#e53935" onclick="pickDiff(2)">Hard</button>
+      <button class="btn" style="background:#43a047" onclick="pickDiff(0, event)">Easy</button>
+      <button class="btn" style="background:#fb8c00" onclick="pickDiff(1, event)">Medium</button>
+      <button class="btn" style="background:#e53935" onclick="pickDiff(2, event)">Hard</button>
     </div>
+    <div id="padstatus" style="font-size:15px; margin:8px auto 0; max-width:600px; line-height:1.5; border-radius:8px; padding:2px 10px"></div>
     <div id="rulesrow">
       <button class="hatbtn" onclick="showRules(event)">How to play</button>
     </div>
@@ -169,17 +176,19 @@
   <p><b>The goal:</b> blast the toilet paper rolls, grab power-ups, and gas every rival. Clear a level and everyone moves up — new maze, meaner rivals. A fart lingers for a moment, then spreads FAST in four directions. Toot and scoot!</p>
   <p><b>Controller:</b> left stick = move &middot; right stick = camera &middot; B or trigger = fart &middot; A = use power-up &middot; X = superpower &middot; click left stick or LT = sprint &middot; + = pause<br>
   <b>Keyboard:</b> WASD + mouse &middot; Space = fart &middot; E = power-up &middot; Q = superpower &middot; Shift = sprint &middot; Esc = pause</p>
-  <p><b>Power-ups</b> (you can hold only ONE — press A to use it; grab a second before using the first and it's wasted):<br>
-  <b style="color:#ffab40">Orange</b> = more gas (more farts at once) &middot; <b style="color:#ff5252">Red</b> = bigger blast &middot;
+  <p><b>Instant boosts</b> (they work the moment you walk over them — already maxed out? the pickup stays on the floor):<br>
+  <b style="color:#ffab40">Orange</b> = more gas (more farts at once, max 4) &middot; <b style="color:#ff5252">Red</b> = bigger blast (max 5) &middot;
+  <b style="color:#40c4ff">Blue</b> = Super Scoot (permanent speed boost, max 7.0). Watch out — rivals grab these too!</p>
+  <p><b>Held items</b> (you can hold only ONE — press A to use it; walk over another while your hands are full and it stays on the floor):<br>
   <b style="color:#66bb6a">Green</b> = trap wall (blocks a tile for 10 seconds — fart + wall = trap!) &middot;
   <b style="color:#eceff1">White</b> = air freshener (makes any fart near you vanish before it spreads) &middot;
-  <b style="color:#ce93d8">Purple</b> = Turbo Toot (face someone and fire — blinds them for 5 seconds!)</p>
+  <b style="color:#ce93d8">Purple</b> = Turbo Toot (aim with your camera and fire — blinds them for 5 seconds!). While holding a wall or Turbo Toot you'll see a glowing aim preview on the floor.</p>
   <p><b>Legendary finds</b> (indestructible — blasts can't destroy them):<br>
   <b style="color:#bcaaa4">The can of beans</b> (10% of drops) — eat it on the spot: for 6 seconds you run at double speed and every tile you cross leaves a fart behind you.<br>
   <b style="color:#ff80ab">The rainbow Extra Life</b> (2% of drops) — carry it and your avatar shimmers rainbow. When you'd get gassed, it saves you: 2 seconds of invincibility at double speed to escape!</p>
   <p><b>Superpower (X):</b> a different one each level, ONE use per level. <b>Gas Mask</b> = walk through gas for 8 seconds. <b>Silent But Deadly</b> = an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast sealed inside.</p>
   <p><b>Sprint and stamina:</b> sprinting gives a speed burst but drains stamina (10 per second of your 100). It refills when you're not sprinting. Run dry and you can't sprint until you catch your breath.</p>
-  <p><b>Every 10th level:</b> BOSS FIGHT! The Big Stinker has 1000 health; every blast that hits him does 100 damage. All your abilities work on him.</p>
+  <p><b>Every 10th level:</b> BOSS FIGHT! The Big Stinker has 1000 health; every blast that hits him does 100 damage. All your abilities work on him. At half health he gets ENRAGED — when glowing warning tiles appear on the floor, scoot off them before they blow!</p>
   <p><b>Scoring:</b> 10 points per roll destroyed &middot; 100 per rival gassed &middot; 200 for gassing another player &middot; 500 for winning a level or round &middot; boss hits 100 each plus a 1000 bonus. Solo high scores go on the leaderboard — enter your initials!</p>
   <p><b>Multiplayer:</b> split screen battle royale with the rivals mixed in. Knocked out? You spectate (A switches who you watch). When someone wins the round, EVERYONE moves on to the next level together, and the win counter keeps the family rivalry honest.</p>
   <button class="mbtn" onclick="hideRules()" style="margin:10px auto 0">Back</button>
@@ -213,6 +222,9 @@
 <div id="blind0" class="blindfx">STINKED!</div>
 <div id="blind1" class="blindfx">STINKED!</div>
 <div id="blind2" class="blindfx">STINKED!</div>
+<div id="pmsg0" class="pmsg"></div>
+<div id="pmsg1" class="pmsg"></div>
+<div id="pmsg2" class="pmsg"></div>
 <div id="hudroot" style="display:none">
   <div class="hpanel" id="hudTL">
     <div class="hlabel">Level</div>
@@ -249,6 +261,7 @@
 <div id="levelmsg"></div>
 <div id="pausemenu" class="menu" style="display:none">
   <h2>Paused</h2>
+  <div id="pausemsg" style="color:#ff8a65; font-size:15px; max-width:300px; margin:0 auto 8px"></div>
   <button class="mbtn" data-act="resume" onclick="menuAction('resume', false)">Resume game</button>
   <button class="mbtn" data-act="settings" onclick="menuAction('settings', false)">Settings</button>
   <button class="mbtn" data-act="quit" onclick="menuAction('quit', false)">Quit</button>
@@ -406,10 +419,38 @@ var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p =
 var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 
+// ---- balance caps for passive upgrades (players AND rivals) ----
+var MAX_GAS = 4, MAX_BLAST = 5, MAX_SPEED = 7.0, SPEED_STEP = 0.5;
+
+// ---- game session + tracked delayed transitions ----
+// EVERY delayed callback that mutates game state goes through later(); bumpSession()
+// (called from startGame / quit / endGame) both clears the pending timeouts AND
+// invalidates the session id each callback captured, so a stale callback can
+// never fire into a game it doesn't belong to.
+var gameSession = 0;
+var pendingTimeouts = [];
+function later(fn, ms) {
+  var sess = gameSession;
+  var id = setTimeout(function () {
+    var ix = pendingTimeouts.indexOf(id);
+    if (ix >= 0) pendingTimeouts.splice(ix, 1);
+    if (sess !== gameSession) return;   // a quit / endGame / startGame happened since
+    fn();
+  }, ms);
+  pendingTimeouts.push(id);
+  return id;
+}
+function bumpSession() {
+  gameSession++;
+  pendingTimeouts.forEach(function (id) { clearTimeout(id); });
+  pendingTimeouts = [];
+}
+
 function pickMode(n, el, ev) {
   if (ev) ev.stopPropagation();
   numPlayers = n;
   for (var i = 1; i <= 3; i++) document.getElementById('modebtn' + i).classList.toggle('hatsel', n === i);
+  updatePadStatus();
 }
 
 var playerColor = 0x2979ff;
@@ -531,7 +572,109 @@ var soundOn = true, camSpeedIdx = 1, camSpeeds = [0.6, 1, 1.6];
 var pausemenuEl = document.getElementById('pausemenu');
 var settingsEl = document.getElementById('settingsmenu');
 
-function pickDiff(d) {
+// ---- controller readiness + per-match assignment ----
+// Assignments are captured ONCE at match start (by gamepad index) and never
+// silently reshuffled mid-match. P1 may always fall back to keyboard + mouse;
+// P2 / P3 require a controller each.
+var padAssign = null;        // { p1: index|-1(keyboard), p2: index|null, p3: index|null }
+var padDiscMsg = '';
+function connectedPads() {
+  var out = [];
+  if (navigator.getGamepads) {
+    var pads = navigator.getGamepads();
+    for (var i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) out.push(pads[i]);
+  }
+  return out;
+}
+function padByIndex(i) {
+  if (i === null || i === undefined || i < 0 || !navigator.getGamepads) return null;
+  var p = navigator.getGamepads()[i];
+  return (p && p.connected) ? p : null;
+}
+function requiredPads() { return Math.max(0, numPlayers - 1); }
+function controllersReady() { return connectedPads().length >= requiredPads(); }
+function assignPads() {
+  var cps = connectedPads();
+  if (cps.length >= numPlayers) {
+    // enough controllers for everyone (P1's is optional but welcome)
+    padAssign = { p1: cps[0].index, p2: cps[1] ? cps[1].index : null, p3: cps[2] ? cps[2].index : null };
+  } else {
+    // one short: P1 takes keyboard + mouse, pads go to P2 and P3
+    padAssign = { p1: -1, p2: cps[0] ? cps[0].index : null, p3: cps[1] ? cps[1].index : null };
+  }
+}
+function reclaimPads() {
+  // a reconnected controller can come back on a new index — hand it to whoever lost theirs
+  if (!padAssign) return;
+  var taken = {};
+  ['p1', 'p2', 'p3'].forEach(function (k) {
+    var v = padAssign[k];
+    if (v !== null && v >= 0 && padByIndex(v)) taken[v] = true;
+  });
+  var cps = connectedPads();
+  ['p1', 'p2', 'p3'].forEach(function (k, ki) {
+    var v = padAssign[k];
+    if (v !== null && v < 0) return;                 // keyboard + mouse — leave it
+    if (v !== null && padByIndex(v)) return;         // still connected
+    if (v === null && ki + 1 > numPlayers) return;   // slot not in play this match
+    for (var i = 0; i < cps.length; i++) {
+      if (!taken[cps[i].index]) { padAssign[k] = cps[i].index; taken[cps[i].index] = true; break; }
+    }
+  });
+}
+function missingPadPlayer() {
+  // only P2/P3 hard-require a controller; P1 falls back to keyboard + mouse
+  if (!padAssign) return null;
+  if (numPlayers >= 2 && !padByIndex(padAssign.p2)) return 'Player 2';
+  if (numPlayers >= 3 && !padByIndex(padAssign.p3)) return 'Player 3';
+  return null;
+}
+var lastPadStatusHtml = null;
+function updatePadStatus() {
+  var el = document.getElementById('padstatus');
+  if (!el) return;
+  var n = connectedPads().length;
+  var lines = [], ready = controllersReady();
+  if (numPlayers === 1) {
+    lines.push('P1: ' + (n >= 1 ? 'Controller 1' : 'keyboard + mouse'));
+  } else {
+    var all = n >= numPlayers;
+    lines.push('P1: ' + (all ? 'Controller 1' : 'keyboard + mouse'));
+    for (var p = 2; p <= numPlayers; p++) {
+      var pi = all ? p - 1 : p - 2;
+      lines.push('P' + p + ': ' + (pi >= 0 && pi < n ? 'Controller ' + (pi + 1)
+        : '<span style="color:#ef9a9a">controller missing — connect one</span>'));
+    }
+  }
+  var short = requiredPads() - n;
+  var html = lines.join(' &middot; ') +
+    (ready ? '' : '<br><span style="color:#ffd54f">Connect ' + short +
+      ' more controller' + (short === 1 ? '' : 's') + ' to start</span>');
+  if (html !== lastPadStatusHtml) {
+    lastPadStatusHtml = html;
+    el.innerHTML = html;
+    titleButtons('startbtns').forEach(function (b) {
+      b.style.opacity = ready ? '1' : '0.4';
+      b.style.cursor = ready ? 'pointer' : 'not-allowed';
+    });
+  }
+}
+function flashStartHint() {
+  var el = document.getElementById('padstatus');
+  if (el) {
+    el.style.outline = '3px solid #ff8a65';
+    setTimeout(function () { el.style.outline = 'none'; }, 900);
+  }
+  snd(140, 0.2, 'square');
+}
+// the ONE gate every start path must pass through
+function canStartGame() {
+  return (!running || gameOver) && !initialsActive && !rulesOpen && !menuOpen && controllersReady();
+}
+
+function pickDiff(d, ev) {
+  if (ev) ev.stopPropagation();
+  if (!canStartGame()) { flashStartHint(); return; }
   difficulty = d;
   startGame();
   try { renderer.domElement.requestPointerLock(); } catch (e) {}
@@ -546,6 +689,7 @@ function renderMenu() {
   settingsEl.style.display = menuOpen && menuScreen === 'settings' ? 'block' : 'none';
   document.getElementById('sndbtn').textContent = 'Sound: ' + (soundOn ? 'On' : 'Off');
   document.getElementById('cambtn').textContent = 'Camera speed: ' + ['Slow', 'Normal', 'Fast'][camSpeedIdx];
+  document.getElementById('pausemsg').textContent = padDiscMsg || '';
   menuButtons().forEach(function (b, i) { b.className = 'mbtn' + (i === menuIndex ? ' sel' : ''); });
 }
 function openMenu() {
@@ -560,20 +704,28 @@ function closeMenus() {
 }
 function menuAction(act, fromPad) {
   if (act === 'resume') {
+    reclaimPads();
+    if (missingPadPlayer()) { snd(140, 0.2, 'square'); renderMenu(); return; }   // can't resume until their controller is back
     closeMenus();
-    humans().forEach(function (h) { h.prevBomb = true; h.prevUse = true; h.prevMask = true; });   // don't let the resume press drop a bomb
+    padDiscMsg = '';
+    // suppress-until-released: every action button must be seen RELEASED
+    // before any press can fire again (see controlHuman / spectate)
+    humans().forEach(function (h) { h.suppress = true; h.prevBomb = true; h.prevUse = true; h.prevMask = true; });
     if (!fromPad) renderer.domElement.requestPointerLock();
   } else if (act === 'settings') { menuScreen = 'settings'; menuIndex = 0; renderMenu(); }
   else if (act === 'back') { menuScreen = 'pause'; menuIndex = 1; renderMenu(); }
   else if (act === 'quit') {
     closeMenus();
+    bumpSession();                       // cancels any pending level-clear transition
     running = false; gameOver = true; transitioning = false;
+    padDiscMsg = '';
+    resetTransientUI();
     hudroot.style.display = 'none';
-    maskoverlay.style.display = 'none';
-    for (var qb = 0; qb < 3; qb++) document.getElementById('blind' + qb).style.display = 'none';
     bigmsg.textContent = '';
     overlay.style.display = 'flex';
     diffbtns.style.display = 'block';
+    renderTitleFocus();
+    updatePadStatus();
   }
   else if (act === 'sound') { soundOn = !soundOn; renderMenu(); }
   else if (act === 'camspeed') { camSpeedIdx = (camSpeedIdx + 1) % 3; renderMenu(); }
@@ -613,7 +765,9 @@ function pillarAt(kind, x, z) {
   }
   return false;
 }
-function findSpawn(tx, tz, used) {
+function findSpawn(tx, tz, used, minDist) {
+  // scans EVERY open tile; minDist is the required spacing from already-used
+  // spawns and can be relaxed (down to 0) when the maze is tight
   var best = null, bd = 1e9;
   for (var z = 1; z < ROWS - 1; z++) {
     for (var x = 1; x < COLS - 1; x++) {
@@ -621,7 +775,7 @@ function findSpawn(tx, tz, used) {
       var tooClose = false;
       for (var k in used) {
         var p = k.split(',');
-        if (Math.abs(p[0] - x) + Math.abs(p[1] - z) < 3) { tooClose = true; break; }
+        if (Math.abs(p[0] - x) + Math.abs(p[1] - z) < minDist) { tooClose = true; break; }
       }
       if (tooClose) continue;
       var d = Math.abs(x - tx) + Math.abs(z - tz);
@@ -676,13 +830,27 @@ function buildWorld() {
   for (var ri = 1; ri < regions.length; ri++) {
     regions[ri].forEach(function (t) { grid[t[1]][t[0]] = 1; });
   }
-  // find safe spawn pockets (corners may not exist in a circle or triangle)
+  // find safe spawn pockets (corners may not exist in a circle or triangle).
+  // guarantee enough unique spawns for every human + up to 6 bots on ANY maze
+  // shape: preferred corner/edge targets first at the normal spacing, then
+  // progressively relax the min-distance rule (3 -> 2 -> 1 -> 0); findSpawn
+  // itself scans every remaining open tile, so if the arena has open floor
+  // we will find it.
   levelSpawns = [];
   var used = {};
-  [[1,1],[COLS-2,ROWS-2],[COLS-2,1],[1,ROWS-2],[7,1],[7,ROWS-2],[COLS-2,6],[1,6]].forEach(function (pr) {
-    var s = findSpawn(pr[0], pr[1], used);
-    if (s) { used[s[0] + ',' + s[1]] = true; levelSpawns.push(s); }
-  });
+  var spawnTargets = [[1,1],[COLS-2,ROWS-2],[COLS-2,1],[1,ROWS-2],[7,1],[7,ROWS-2],[COLS-2,6],[1,6]];
+  var spawnsNeeded = numPlayers + 6;
+  var spacingPasses = [3, 2, 1, 0];
+  for (var spi = 0; spi < spacingPasses.length && levelSpawns.length < spawnsNeeded; spi++) {
+    for (var sti = 0; sti < spawnTargets.length && levelSpawns.length < spawnsNeeded; sti++) {
+      var s = findSpawn(spawnTargets[sti][0], spawnTargets[sti][1], used, spacingPasses[spi]);
+      if (s && !used[s[0] + ',' + s[1]]) {
+        used[s[0] + ',' + s[1]] = true;
+        levelSpawns.push(s);
+      }
+    }
+  }
+  // clear a safe pocket around every final spawn
   levelSpawns.forEach(function (s) {
     [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(function (d) {
       var x = s[0] + d[0], z = s[1] + d[1];
@@ -855,8 +1023,15 @@ function nearestPlayerTile(gx, gz) {
   return best || { x: 1, z: 1 };
 }
 
+function carryStats(prevPlayer) {
+  // the ONE rule for what persists between levels — used identically for P1, P2, P3
+  if (!prevPlayer) return { score: 0, wins: 0, lives: 0 };
+  return { score: prevPlayer.score || 0, wins: prevPlayer.wins || 0, lives: prevPlayer.lives || 0 };
+}
+
 function startLevel(keepStats) {
   // clean up everything left over from the previous round
+  resetTransientUI();
   if (bombs) bombs.forEach(function (b) { scene.remove(b.mesh); });
   if (explosions) explosions.forEach(function (e) { scene.remove(e.mesh); });
   if (powerups) powerups.forEach(function (u) { scene.remove(u.mesh); });
@@ -883,16 +1058,13 @@ function startLevel(keepStats) {
   };
 
   var superType = SUPERS[(level - 1) % SUPERS.length];
-  var prevW1 = keepStats && player ? (player.wins || 0) : 0;
-  var prevW2 = keepStats && player2 ? (player2.wins || 0) : 0;
-  var prevW3 = keepStats && player3 ? (player3.wins || 0) : 0;
-  var prevL2 = keepStats && player2 ? (player2.lives || 0) : 0;
-  var prevL3 = keepStats && player3 ? (player3.lives || 0) : 0;
-  var prevS1 = keepStats && player ? (player.score || 0) : 0;
-  var prevS2 = keepStats && player2 ? (player2.score || 0) : 0;
-  var prevS3 = keepStats && player3 ? (player3.score || 0) : 0;
-  var c = tileCenter(levelSpawns[0][0], levelSpawns[0][1]);
-  var prev = keepStats && !twoPlayer && player ? player : null;
+  // persistent stats survive between levels the same way for every player
+  var cs1 = carryStats(keepStats ? player : null);
+  var cs2 = carryStats(keepStats ? player2 : null);
+  var cs3 = carryStats(keepStats ? player3 : null);
+  var sp1 = levelSpawns[0] || [1, 1];
+  var c = tileCenter(sp1[0], sp1[1]);
+  var prev = keepStats && !twoPlayer && player ? player : null;   // solo also carries upgrades + held item
   player = {
     x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(playerColor, playerHat), baseColor: playerColor,
     yaw: Math.PI + 0.6, pitch: 0.55,
@@ -900,35 +1072,38 @@ function startLevel(keepStats) {
     maxBombs: prev ? prev.maxBombs : 1,
     range:    prev ? prev.range    : 2,
     held:     prev ? prev.held     : null,
-    score:    prev ? prev.score    : prevS1,
-    wins:     prevW1,
-    lives:    keepStats && player ? (player.lives || 0) : 0,
+    score:    cs1.score,
+    wins:     cs1.wins,
+    lives:    cs1.lives,
     stamina:  100,
     maskTime: 0,
+    suppress: true,
     superType: superType,
     superUsed: false
   };
   player.mesh.position.set(c.x, 0, c.z);
   if (twoPlayer) {
-    var c2 = tileCenter(levelSpawns[1][0], levelSpawns[1][1]);
+    var sp2 = levelSpawns[1] || sp1;
+    var c2 = tileCenter(sp2[0], sp2[1]);
     player2 = {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
-      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2, lives: prevL2, score: prevS2, stamina: 100,
-      maskTime: 0, superType: superType, superUsed: false
+      speed: 5, maxBombs: 1, range: 2, held: null, wins: cs2.wins, lives: cs2.lives, score: cs2.score, stamina: 100,
+      maskTime: 0, suppress: true, superType: superType, superUsed: false
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
     if (numPlayers >= 3) {
-      var c3 = tileCenter(levelSpawns[2][0], levelSpawns[2][1]);
+      var sp3 = levelSpawns[2] || sp1;
+      var c3 = tileCenter(sp3[0], sp3[1]);
       var p3color = playerColor === 0xd500f9 ? 0xff9100 : 0xd500f9;
       var p3hat = playerHat === 'tproll' ? 'party' : 'tproll';
       player3 = {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
-        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3, lives: prevL3, score: prevS3, stamina: 100,
-        maskTime: 0, superType: superType, superUsed: false
+        speed: 5, maxBombs: 1, range: 2, held: null, wins: cs3.wins, lives: cs3.lives, score: cs3.score, stamina: 100,
+        maskTime: 0, suppress: true, superType: superType, superUsed: false
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
       cameraTop.position.set(COLS * TS / 2, 27, ROWS * TS / 2 + 7);
@@ -966,11 +1141,16 @@ function startLevel(keepStats) {
     bossBot.speed = 3.2;
     bossBot.range = 4;
     bossBot.maxBombs = 2;
+    bossBot.phase = 1;
+    bossBot.specialCd = 0;
+    bossBot.telegraph = 0;
     bots.push(bossBot);
   } else {
     var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
-    for (var i = 0; i < levelParams.botCount; i++) {
-      var sp = spawns.length ? spawns[i % spawns.length] : [7, 6];   // more bots than spawn pockets: reuse
+    // never index a spawn that doesn't exist: cap the bot count to available spawns
+    var botN = Math.min(levelParams.botCount, spawns.length);
+    for (var i = 0; i < botN; i++) {
+      var sp = spawns[i];
       var b = makeBot(sp[0], sp[1], botDefs[i][0], botDefs[i][1]);
       b.speed = levelParams.botSpeed;
       b.range = levelParams.botRange;
@@ -982,15 +1162,88 @@ function startLevel(keepStats) {
 }
 
 function startGame() {
+  bumpSession();               // invalidate every delayed callback from the old game
+  padDiscMsg = '';
+  assignPads();                // lock controller assignments for this match
   level = 1;
   if (numPlayers === 2) round2p++;
   startLevel(false);
 }
 
+var levelMsgTimer = null;
 function showLevelMsg(text) {
   levelmsg.textContent = text;
   levelmsg.style.display = 'block';
-  setTimeout(function () { levelmsg.style.display = 'none'; }, 1600);
+  if (levelMsgTimer) clearTimeout(levelMsgTimer);
+  levelMsgTimer = setTimeout(function () { levelmsg.style.display = 'none'; levelMsgTimer = null; }, 1600);
+}
+
+// ---- per-player contextual feedback (positioned inside that player's viewport) ----
+var pmsgTimers = [null, null, null];
+function humanIndex(p) { return p === player ? 0 : p === player2 ? 1 : 2; }
+function showPMsg(p, text, kind) {
+  if (!p) return;
+  var t = performance.now();
+  p.msgCd = p.msgCd || {};
+  if (p.msgCd[kind] && t - p.msgCd[kind] < 1500) return;   // throttle repeats per message kind
+  p.msgCd[kind] = t;
+  var i = humanIndex(p);
+  var el = document.getElementById('pmsg' + i);
+  if (!el) return;
+  var r = viewRect(p);
+  el.style.left = (r.l + r.w / 2) + '%';
+  el.style.top = (r.t + r.h * 0.6) + '%';
+  el.textContent = text;
+  el.style.display = 'block';
+  if (pmsgTimers[i]) clearTimeout(pmsgTimers[i]);
+  pmsgTimers[i] = setTimeout(function () { el.style.display = 'none'; pmsgTimers[i] = null; }, 1200);
+}
+function cappedFx(p, text, kind) {
+  // "you're full" feedback: message + a throttled fizzle sound
+  showPMsg(p, text, kind);
+  var t = performance.now();
+  if (!p.capSndAt || t - p.capSndAt > 900) { p.capSndAt = t; snd(150, 0.2, 'sine'); }
+}
+function clearPlayerMsgs() {
+  for (var i = 0; i < 3; i++) {
+    if (pmsgTimers[i]) { clearTimeout(pmsgTimers[i]); pmsgTimers[i] = null; }
+    var el = document.getElementById('pmsg' + i);
+    if (el) el.style.display = 'none';
+  }
+}
+
+function resetTransientUI() {
+  // hide/clear every transient overlay, timer, and helper mesh.
+  // safe to call any time: quit, endGame, and every startLevel go through here.
+  maskoverlay.style.display = 'none';
+  maskoverlay.style.opacity = '1';
+  for (var i = 0; i < 3; i++) {
+    var bl = document.getElementById('blind' + i);
+    if (bl) bl.style.display = 'none';
+  }
+  var bb = document.getElementById('bossbar');
+  if (bb) bb.style.display = 'none';
+  var sb = document.getElementById('stambar');
+  if (sb) sb.style.display = 'none';
+  if (levelMsgTimer) { clearTimeout(levelMsgTimer); levelMsgTimer = null; }
+  levelmsg.style.display = 'none';
+  clearPlayerMsgs();
+  clearBossWarnings();
+  humans().forEach(function (p) {
+    clearPreview(p);
+    p.blindTime = 0;
+    p.reviveTime = 0;
+    p.beansTime = 0;
+    removeBlindCloud(p);
+    if (p.maskTime > 0) {
+      p.maskTime = 0;
+      if (p.mesh && p.mesh.userData && p.mesh.userData.mat) p.mesh.userData.mat.color.setHex(p.baseColor);
+    }
+  });
+  if (bots) bots.forEach(function (b) {
+    b.blindTime = 0;
+    removeBlindCloud(b);
+  });
 }
 
 // ---------- helpers ----------
@@ -1193,6 +1446,7 @@ function spawnPowerup(x, z) {
   var types = [
     { t: 'bomb',  color: 0xffab40 },
     { t: 'range', color: 0xff5252 },
+    { t: 'speed', color: 0x40c4ff },
     { t: 'wall',  color: 0x66bb6a },
     { t: 'spray', color: 0xf5f5f5 },
     { t: 'turbo', color: 0x9c27b0 }
@@ -1293,7 +1547,23 @@ function botThink(bot, dt) {
   }
   if (!options.length) return;
   var pick = options[Math.floor(Math.random() * options.length)];
-  if (Math.random() < levelParams.chaseChance) {
+  // a useful passive upgrade (gas/range/speed) within ~4 tiles? head for it —
+  // options above already exclude danger tiles, and the flee branch ran first
+  var puT = null, puD = 5;
+  powerups.forEach(function (u) {
+    if (u.type !== 'bomb' && u.type !== 'range' && u.type !== 'speed') return;
+    if (!botWantsPU(bot, u)) return;
+    var d2 = Math.abs(u.gx - bot.gx) + Math.abs(u.gz - bot.gz);
+    if (d2 < puD) { puD = d2; puT = u; }
+  });
+  if (puT) {
+    options.sort(function (a, b) {
+      var da = Math.abs(puT.gx - (bot.gx + a[0])) + Math.abs(puT.gz - (bot.gz + a[1]));
+      var db = Math.abs(puT.gx - (bot.gx + b[0])) + Math.abs(puT.gz - (bot.gz + b[1]));
+      return da - db;
+    });
+    pick = options[0];
+  } else if (Math.random() < levelParams.chaseChance) {
     options.sort(function (a, b) {
       var da = Math.abs(pt.x - (bot.gx + a[0])) + Math.abs(pt.z - (bot.gz + a[1]));
       var db = Math.abs(pt.x - (bot.gx + b[0])) + Math.abs(pt.z - (bot.gz + b[1]));
@@ -1302,6 +1572,12 @@ function botThink(bot, dt) {
     pick = options[0];
   }
   tryMoveBot(bot, pick[0], pick[1]);
+}
+function botWantsPU(bot, u) {
+  if (u.type === 'bomb') return bot.maxBombs < MAX_GAS;
+  if (u.type === 'range') return bot.range < MAX_BLAST;
+  if (u.type === 'speed') return bot.speed < MAX_SPEED - 0.001;
+  return false;
 }
 
 // ---------- input ----------
@@ -1312,25 +1588,91 @@ var maskoverlay = document.getElementById('maskoverlay');
 var levelmsg = document.getElementById('levelmsg');
 var diffbtns = document.getElementById('diffbtns');
 
+// ---- aiming: directional abilities aim from the player's CAMERA yaw ----
+// (forward = (-sin(yaw), -cos(yaw)), matching controlHuman's movement math),
+// snapped to the closest cardinal direction — NOT the mesh's walk rotation.
+function aimDir(p) {
+  var fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+  if (Math.abs(fx) > Math.abs(fz)) return { dx: fx > 0 ? 1 : -1, dz: 0 };
+  return { dx: 0, dz: fz > 0 ? 1 : -1 };
+}
+
+// ---- targeting previews while holding a Trap Wall or Turbo Toot ----
+var previewBoxGeo  = new THREE.BoxGeometry(TS * 0.92, TS * 0.92, TS * 0.92);
+var previewLaneGeo = new THREE.BoxGeometry(TS * 0.9, 0.14, TS * 0.9);
+var previewMatOk   = new THREE.MeshBasicMaterial({ color: 0x69f0ae, transparent: true, opacity: 0.35, depthWrite: false });
+var previewMatBad  = new THREE.MeshBasicMaterial({ color: 0xff5252, transparent: true, opacity: 0.35, depthWrite: false });
+var previewMatHit  = new THREE.MeshBasicMaterial({ color: 0xea80fc, transparent: true, opacity: 0.45, depthWrite: false });
+var previewMatMiss = new THREE.MeshBasicMaterial({ color: 0xb0bec5, transparent: true, opacity: 0.22, depthWrite: false });
+function clearPreview(p) {
+  if (p && p.previewGroup) { scene.remove(p.previewGroup); p.previewGroup = null; }
+}
+function wallTargetInfo(p) {
+  var d = aimDir(p), pt = tileOf(p);
+  var x = pt.x + d.dx, z = pt.z + d.dz;
+  var inb = !(x <= 0 || z <= 0 || x >= COLS - 1 || z >= ROWS - 1);
+  var ok = inb && grid[z][x] === 0 && !bombAt(x, z);
+  if (ok) {
+    var occupied = bots.some(function (b) {
+      return b.alive && ((b.gx === x && b.gz === z) || (b.moving && b.tx === x && b.tz === z));
+    }) || humans().some(function (h) {
+      var t = tileOf(h);
+      return h !== p && h.alive && t.x === x && t.z === z;
+    });
+    if (occupied) ok = false;
+  }
+  return { x: x, z: z, inBounds: inb, ok: ok };
+}
+function turboLaneInfo(p) {
+  var d = aimDir(p), pt = tileOf(p);
+  var tiles = [], hit = false;
+  for (var r = 1; r <= 4; r++) {
+    var x = pt.x + d.dx * r, z = pt.z + d.dz * r;
+    if (x < 0 || z < 0 || x >= COLS || z >= ROWS) break;
+    if (grid[z][x] === 1 || grid[z][x] === 3) break;
+    tiles.push([x, z]);
+    var victim = bots.some(function (b) {
+      return b.alive && ((b.gx === x && b.gz === z) || (b.moving && b.tx === x && b.tz === z));
+    }) || humans().some(function (h) {
+      if (h === p || !h.alive) return false;
+      var t = tileOf(h);
+      return t.x === x && t.z === z;
+    });
+    if (victim) { hit = true; break; }
+  }
+  return { tiles: tiles, hit: hit };
+}
+function updatePreviews() {
+  humans().forEach(function (p) {
+    clearPreview(p);
+    if (!p.alive || (p.held !== 'wall' && p.held !== 'turbo')) return;
+    var g = new THREE.Group();
+    if (p.held === 'wall') {
+      var wt = wallTargetInfo(p);
+      if (wt.inBounds) {
+        var c = tileCenter(wt.x, wt.z);
+        var m = new THREE.Mesh(previewBoxGeo, wt.ok ? previewMatOk : previewMatBad);
+        m.position.set(c.x, TS / 2, c.z);
+        g.add(m);
+      }
+    } else {
+      var ln = turboLaneInfo(p);
+      ln.tiles.forEach(function (t) {
+        var c2 = tileCenter(t[0], t[1]);
+        var m2 = new THREE.Mesh(previewLaneGeo, ln.hit ? previewMatHit : previewMatMiss);
+        m2.position.set(c2.x, 0.1, c2.z);
+        g.add(m2);
+      });
+    }
+    if (g.children.length) { scene.add(g); p.previewGroup = g; }
+  });
+}
+
 function placeWall(p) {
-  // put the wall on the tile the character is facing
-  var rot = p.mesh.rotation.y;
-  var sx = Math.sin(rot), cz = Math.cos(rot);
-  var dx = 0, dz = 0;
-  if (Math.abs(sx) > Math.abs(cz)) dx = sx > 0 ? 1 : -1;
-  else dz = cz > 0 ? 1 : -1;
-  var pt = tileOf(p);
-  var x = pt.x + dx, z = pt.z + dz;
-  if (x <= 0 || z <= 0 || x >= COLS - 1 || z >= ROWS - 1) return false;
-  if (grid[z][x] !== 0 || bombAt(x, z)) return false;
-  var occupied = bots.some(function (b) {
-    return b.alive && ((b.gx === x && b.gz === z) || (b.moving && b.tx === x && b.tz === z));
-  });
-  if (!occupied) occupied = humans().some(function (h) {
-    var t = tileOf(h);
-    return h !== p && h.alive && t.x === x && t.z === z;
-  });
-  if (occupied) return false;
+  // put the wall on the tile the CAMERA is aiming at (matches the preview)
+  var wt = wallTargetInfo(p);
+  if (!wt.ok) return false;
+  var x = wt.x, z = wt.z;
   grid[z][x] = 3;
   var c = tileCenter(x, z);
   var m = new THREE.Mesh(boxGeo, matTempWall);
@@ -1406,7 +1748,7 @@ function dutchOven(p) {
 
 function useSuperFor(p) {
   if (!running || !p || !p.alive) return;
-  if (p.superUsed || p.maskTime > 0) { snd(110, 0.15, 'square'); return; }
+  if (p.superUsed || p.maskTime > 0) { showPMsg(p, 'Superpower used', 'super'); snd(110, 0.15, 'square'); return; }
   var t = p.superType;
   if (t === 'mask') {
     p.superUsed = true;
@@ -1438,7 +1780,93 @@ function addBlindCloud(v) {
   v.blindMesh = m;
 }
 function removeBlindCloud(v) {
-  if (v.blindMesh) { v.mesh.remove(v.blindMesh); v.blindMesh = null; }
+  if (v.blindMesh && v.mesh) { v.mesh.remove(v.blindMesh); v.blindMesh = null; }
+}
+
+// ---- The Big Stinker, phase 2: enraged at half health ----
+var warnGeo = new THREE.PlaneGeometry(TS * 0.95, TS * 0.95);
+var warnMat = new THREE.MeshBasicMaterial({ color: 0xff7043, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
+var bossWarnMeshes = [];
+function clearBossWarnings() {
+  bossWarnMeshes.forEach(function (m) { scene.remove(m); });
+  bossWarnMeshes = [];
+}
+function bossCrossTiles(gx, gz) {
+  // a big cardinal cross, range 5 — stops at permanent walls AND trap walls,
+  // exactly like a normal blast (crates don't stop it; diagonals stay open)
+  var tiles = [[gx, gz]];
+  [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+    for (var r = 1; r <= 5; r++) {
+      var x = gx + d[0] * r, z = gz + d[1] * r;
+      if (x < 0 || z < 0 || x >= COLS || z >= ROWS) break;
+      if (grid[z][x] === 1 || grid[z][x] === 3) break;
+      tiles.push([x, z]);
+    }
+  });
+  return tiles;
+}
+function enrageBoss(bot) {
+  bot.phase = 2;
+  bot.speed += 0.8;
+  bot.maxBombs = 3;
+  bot.specialCd = 2.5;               // first special no sooner than 2.5s into phase 2
+  bot.telegraph = 0;
+  bot.mesh.traverse(function (o) {   // red tint on all his materials
+    if (o.isMesh && o.material && o.material.color) {
+      o.material = o.material.clone();
+      o.material.color.lerp(new THREE.Color(0xff2200), 0.45);
+    }
+  });
+  showLevelMsg('THE BIG STINKER IS ENRAGED!');
+  snd(48, 1.2, 'sawtooth');
+  snd(90, 0.8, 'square');
+}
+function updateBossSpecial(bot, dt) {
+  if (bot.telegraph > 0) {
+    bot.telegraph -= dt;
+    warnMat.opacity = 0.28 + 0.22 * Math.abs(Math.sin(performance.now() / 90));
+    if (bot.telegraph <= 0) {
+      clearBossWarnings();
+      // detonate along the warned lanes, recomputed against the CURRENT grid so a
+      // trap wall raised during the telegraph blocks propagation like any blast.
+      // These go through the normal explosion system (masks, kill logic, walls,
+      // air freshener interplay all behave as usual); owner = boss, and the boss
+      // hit code skips explosions he owns, so he can't hurt himself.
+      var org = bot.warnOrigin || [bot.gx, bot.gz];
+      bossCrossTiles(org[0], org[1]).forEach(function (t) {
+        var x = t[0], z = t[1];
+        if (grid[z][x] === 2) removeCrate(x, z);
+        var c = tileCenter(x, z);
+        var m = new THREE.Mesh(boomGeo, matBoom);
+        m.position.set(c.x, TS * 0.45, c.z);
+        scene.add(m);
+        explosions.push({ gx: x, gz: z, timer: 0.5, mesh: m, owner: bot });
+        var other = bombAt(x, z);
+        if (other) explode(other);
+      });
+      bot.warnOrigin = null;
+      fart(FARTS['The Big Stinker'], true);
+      snd(45, 0.9, 'sawtooth');
+      bot.specialCd = 7 + Math.random() * 2;    // ~7-9s between specials
+    }
+    return;
+  }
+  bot.specialCd -= dt;
+  if (bot.specialCd <= 0) {
+    // telegraph: flat translucent warning tiles for 1.2s before the blast
+    bot.warnOrigin = [bot.gx, bot.gz];
+    bossCrossTiles(bot.gx, bot.gz).forEach(function (t) {
+      var c = tileCenter(t[0], t[1]);
+      var m = new THREE.Mesh(warnGeo, warnMat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(c.x, 0.12, c.z);
+      scene.add(m);
+      bossWarnMeshes.push(m);
+    });
+    bot.telegraph = 1.2;
+    snd(210, 0.25, 'square');
+    snd(150, 0.4, 'square');
+  }
 }
 function spawnStinkPuff(x, z) {
   var c = tileCenter(x, z);
@@ -1449,15 +1877,13 @@ function spawnStinkPuff(x, z) {
   domes.push({ mesh: m, timer: 1.2 });
 }
 function turboToot(p) {
-  // a directed blast of stink: blinds whoever is in front of you for 5 seconds
-  var rot = p.mesh.rotation.y;
-  var sx = Math.sin(rot), cz = Math.cos(rot);
-  var dx = 0, dz = 0;
-  if (Math.abs(sx) > Math.abs(cz)) dx = sx > 0 ? 1 : -1;
-  else dz = cz > 0 ? 1 : -1;
+  // a directed blast of stink: blinds whoever is in front of you for 5 seconds.
+  // aimed from the CAMERA yaw (matches the lane preview), not the walk rotation
+  var d = aimDir(p);
   var pt = tileOf(p);
   for (var r = 1; r <= 4; r++) {
-    var x = pt.x + dx * r, z = pt.z + dz * r;
+    var x = pt.x + d.dx * r, z = pt.z + d.dz * r;
+    if (x < 0 || z < 0 || x >= COLS || z >= ROWS) break;
     if (grid[z][x] === 1 || grid[z][x] === 3) break;   // walls block the stink
     var victim = null;
     bots.forEach(function (b) {
@@ -1484,17 +1910,18 @@ function turboToot(p) {
 function usePowerupFor(p) {
   if (!running || !p || !p.alive || !p.held) return;
   if (p.held === 'wall') {
-    if (!placeWall(p)) { snd(110, 0.2, 'square'); return; }  // no room there — keep holding it
+    if (!placeWall(p)) { showPMsg(p, 'Tile blocked', 'use'); snd(110, 0.2, 'square'); return; }   // no room there — keep holding it
   }
   else if (p.held === 'spray') {
-    if (!sprayAir(p)) { snd(110, 0.2, 'square'); return; }   // no fart nearby — save it for when you need it
+    if (!sprayAir(p)) { showPMsg(p, 'No fart nearby', 'use'); snd(110, 0.2, 'square'); return; }  // save it for when you need it
   }
   else if (p.held === 'turbo') {
-    if (!turboToot(p)) { snd(110, 0.2, 'square'); return; }  // nobody in front of you — keep it
+    if (!turboToot(p)) { showPMsg(p, 'No target ahead', 'use'); snd(110, 0.2, 'square'); return; } // nobody in your lane — keep it
   }
-  else if (p.held === 'bomb') p.maxBombs++;
-  else if (p.held === 'range') p.range++;
+  else if (p.held === 'bomb') p.maxBombs = Math.min(MAX_GAS, p.maxBombs + 1);
+  else if (p.held === 'range') p.range = Math.min(MAX_BLAST, p.range + 1);
   p.held = null;
+  clearPreview(p);
   snd(880, 0.18, 'sine');
 }
 var locked = false;
@@ -1503,14 +1930,25 @@ var padBombPrev = false, padStartPrev = false, padUsePrev = false;
 var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false, padLtPrev = false, padRtPrev = false;
 
 overlay.addEventListener('click', function () {
+  if (running && !gameOver) return;                 // bubbled click from a start button that already began the game
+  if (!canStartGame()) { flashStartHint(); return; }
   renderer.domElement.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', function () {
   locked = document.pointerLockElement === renderer.domElement;
   if (locked) {
-    if (!running || gameOver) startGame();
-    overlay.style.display = 'none';
-    closeMenus();
+    if (running && !gameOver) {
+      overlay.style.display = 'none';
+      closeMenus();
+    } else if (canStartGame()) {
+      startGame();
+      overlay.style.display = 'none';
+      closeMenus();
+    } else {
+      // a modal (rules / initials / pause) is open or controllers are missing:
+      // gaining pointer lock must NOT start a game
+      document.exitPointerLock();
+    }
   } else {
     if (running && !gameOver) {
       openMenu();
@@ -1576,12 +2014,13 @@ document.addEventListener('mousedown', function () { if (locked) dropBombFor(pla
 
 function endGame(text) {
   gameOver = true; running = false; transitioning = false;
+  bumpSession();               // cancels pending transitions; new session for our own delay below
   closeMenus();
+  padDiscMsg = '';
+  resetTransientUI();
   hudroot.style.display = 'none';
-  maskoverlay.style.display = 'none';
-  for (var eb = 0; eb < 3; eb++) document.getElementById('blind' + eb).style.display = 'none';
   bigmsg.textContent = text;
-  setTimeout(function () {
+  later(function () {          // session-guarded: a quit or new game cancels this too
     if (document.pointerLockElement) document.exitPointerLock();
     if (!twoPlayer && player && player.score > 0 && scoreQualifies(player.score)) {
       showInitials({ score: player.score, level: level });
@@ -1590,6 +2029,7 @@ function endGame(text) {
       diffbtns.style.display = 'block';
       renderTitleFocus();
     }
+    updatePadStatus();
   }, 600);
 }
 
@@ -1601,14 +2041,21 @@ function controlHuman(p, pd, kb, dt) {
     if (Math.abs(rx) > 0.2) p.yaw -= rx * 2.8 * sens * dt;
     if (Math.abs(ry) > 0.2) p.pitch = Math.max(0.25, Math.min(1.25, p.pitch + ry * 1.8 * sens * dt));
     var bp = (pd.buttons[0] && pd.buttons[0].pressed) || (pd.buttons[7] && pd.buttons[7].pressed);
-    if (bp && !p.prevBomb) dropBombFor(p);
-    p.prevBomb = bp;
     var ub = pd.buttons[1] && pd.buttons[1].pressed;
-    if (ub && !p.prevUse) usePowerupFor(p);
-    p.prevUse = ub;
     var mk = (pd.buttons[2] && pd.buttons[2].pressed) || (pd.buttons[3] && pd.buttons[3].pressed);
-    if (mk && !p.prevMask) useSuperFor(p);
-    p.prevMask = mk;
+    if (p.suppress) {
+      // just resumed (or just spawned): ALL action buttons must be seen released
+      // before any press can fire — release and re-press to act
+      if (!bp && !ub && !mk) { p.suppress = false; p.prevBomb = false; p.prevUse = false; p.prevMask = false; }
+      else { p.prevBomb = true; p.prevUse = true; p.prevMask = true; }
+    } else {
+      if (bp && !p.prevBomb) dropBombFor(p);
+      p.prevBomb = bp;
+      if (ub && !p.prevUse) usePowerupFor(p);
+      p.prevUse = ub;
+      if (mk && !p.prevMask) useSuperFor(p);
+      p.prevMask = mk;
+    }
   }
   var fwd = 0, str = 0;
   if (kb) {
@@ -1628,6 +2075,7 @@ function controlHuman(p, pd, kb, dt) {
   var wantSprint = false;
   if (kb && (keys['ShiftLeft'] || keys['ShiftRight'])) wantSprint = true;
   if (pd && ((pd.buttons[10] && pd.buttons[10].pressed) || (pd.buttons[6] && pd.buttons[6].pressed))) wantSprint = true;
+  if (wantSprint && moving && p.exhausted) showPMsg(p, 'Too tired to sprint', 'sprint');   // throttled inside showPMsg
   var sprinting = wantSprint && moving && !p.exhausted;
   if (sprinting) p.stamina = Math.max(0, p.stamina - 10 * dt);
   else p.stamina = Math.min(100, p.stamina + 20 * dt);
@@ -1646,12 +2094,32 @@ function controlHuman(p, pd, kb, dt) {
   if (fwd || str) p.mesh.rotation.y = Math.atan2(vx, vz);
 }
 
+function camBlockedAt(x, y, z) {
+  if (y >= TS) return false;                       // above wall height — always clear
+  var gx = Math.floor(x / TS), gz = Math.floor(z / TS);
+  if (gx < 0 || gz < 0 || gx >= COLS || gz >= ROWS) return false;
+  var g = grid[gz][gx];
+  return g === 1 || g === 2 || g === 3;            // walls, crates, trap walls (never the floor)
+}
 function placeCam(cam, p) {
-  var cd = 6.5;
-  var ox = Math.sin(p.yaw) * Math.cos(p.pitch) * cd;
-  var oz = Math.cos(p.yaw) * Math.cos(p.pitch) * cd;
-  var oy = 1.2 + Math.sin(p.pitch) * cd;
-  cam.position.set(p.x + ox, oy, p.z + oz);
+  var want = 6.5;
+  var dx = Math.sin(p.yaw) * Math.cos(p.pitch);
+  var dz = Math.cos(p.yaw) * Math.cos(p.pitch);
+  var dy = Math.sin(p.pitch);
+  // cheap grid march from the head toward the desired camera spot: sample every
+  // ~0.3 units; if a solid tile is in the way, pull the camera in just before it
+  var target = want;
+  for (var d = 0.3; d <= want; d += 0.3) {
+    if (camBlockedAt(p.x + dx * d, 1.25 + dy * d, p.z + dz * d)) {
+      target = Math.max(0.7, d - 0.3);
+      break;
+    }
+  }
+  if (p.camDist === undefined) p.camDist = target;
+  if (target < p.camDist) p.camDist = target;                    // snap in when blocked
+  else p.camDist += (target - p.camDist) * 0.12;                 // smooth the recovery back out
+  var cd = p.camDist;
+  cam.position.set(p.x + dx * cd, 1.2 + dy * cd, p.z + dz * cd);
   cam.lookAt(p.x, 1.1, p.z);
 }
 
@@ -1668,8 +2136,14 @@ function spectate(p, pd, cam, dt) {
   if (p.spec === undefined) p.spec = 0;
   if (pd) {
     var aP = (pd.buttons[0] && pd.buttons[0].pressed) || (pd.buttons[1] && pd.buttons[1].pressed);
-    if (aP && !p.prevBomb) p.spec++;
-    p.prevBomb = aP;
+    if (p.suppress) {
+      // just resumed: require a full release before A switches the target
+      if (!aP) { p.suppress = false; p.prevBomb = false; }
+      else p.prevBomb = true;
+    } else {
+      if (aP && !p.prevBomb) p.spec++;
+      p.prevBomb = aP;
+    }
     var sens = camSpeeds[camSpeedIdx];
     var rx = pd.axes[2] || 0, ry = pd.axes[3] || 0;
     if (Math.abs(rx) > 0.2) p.yaw -= rx * 2.8 * sens * dt;
@@ -1679,7 +2153,9 @@ function spectate(p, pd, cam, dt) {
   var t = targets[idx];
   p.specName = names[idx];
   var pos = t.x !== undefined ? { x: t.x, z: t.z } : { x: t.mesh.position.x, z: t.mesh.position.z };
-  placeCam(cam, { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch });
+  var tmp = { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch, camDist: p.camDist };
+  placeCam(cam, tmp);
+  p.camDist = tmp.camDist;
 }
 
 function viewRect(p) {
@@ -1701,7 +2177,7 @@ function twoPHudHtml(label, col, p) {
       '<div style="height:100%;width:' + Math.round(p.stamina) + '%;background:' + stCol + '"></div></div>'
     : '';
   return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + ' · ' + (p.score || 0) + ' pts</div>' + stBar +
-    '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range +
+    '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range + ' · Spd ' + p.speed.toFixed(1) +
       (p.lives > 0 ? ' · Lives ' + p.lives : '') +
       (p.beansTime > 0 ? ' · BEANS ' + Math.ceil(p.beansTime) + 's!' : '') :
       'KNOCKED OUT' + (p.specName ? ' — watching ' + p.specName : '') + ' (A = switch)') + '</div>' +
@@ -1716,26 +2192,43 @@ function animate() {
   var dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
-  // gamepads: with two controllers P1 gets the first and P2 the second;
-  // with one controller in 2P mode, P1 takes keyboard+mouse and P2 gets the pad
+  // gamepads: assignments were locked at match start (assignPads) and are read
+  // back by index every frame — a mid-match connect/disconnect never reshuffles
+  // who owns which controller. cps[0] still drives menus and the title screen.
   var pad = null, p1pad = null, p2pad = null, p3pad = null;
-  if (navigator.getGamepads) {
-    var pads = navigator.getGamepads(), cps = [];
-    for (var gi = 0; gi < pads.length; gi++) if (pads[gi] && pads[gi].connected) cps.push(pads[gi]);
-    pad = cps[0] || null;
-    if (cps.length >= numPlayers) {
-      // enough controllers for everyone
-      p1pad = cps[0] || null; p2pad = cps[1] || null; p3pad = cps[2] || null;
-    } else {
-      // one short: P1 falls back to keyboard+mouse, pads go to P2 and P3
-      p2pad = cps[0] || null; p3pad = cps[1] || null;
-    }
+  var cps = connectedPads();
+  pad = cps[0] || null;
+  if (running && !gameOver && padAssign) {
+    // a vanished assigned controller ALWAYS pauses the game with a message naming
+    // which player lost it (checked BEFORE reclaiming a replacement pad)
+    var lostNow = (padAssign.p1 !== null && padAssign.p1 >= 0 && !padByIndex(padAssign.p1)) ? 'Player 1'
+      : (numPlayers >= 2 && padAssign.p2 !== null && padAssign.p2 >= 0 && !padByIndex(padAssign.p2)) ? 'Player 2'
+      : (numPlayers >= 3 && padAssign.p3 !== null && padAssign.p3 >= 0 && !padByIndex(padAssign.p3)) ? 'Player 3' : null;
+    reclaimPads();   // a reconnected (or spare) pad may fill the gap, possibly on a new index
+    if (lostNow === 'Player 1' && !padByIndex(padAssign.p1)) padAssign.p1 = -1;   // P1 falls back to keyboard + mouse
+    var missNow = missingPadPlayer();
+    var newMsg = padDiscMsg;
+    if (missNow) newMsg = missNow + ' lost their controller — reconnect it to resume';
+    else if (lostNow) newMsg = (lostNow === 'Player 1' && padAssign.p1 === -1)
+      ? 'Player 1 controller disconnected — using keyboard + mouse'
+      : lostNow + '\'s controller was replaced — you can resume';
+    else if (padDiscMsg && padDiscMsg.indexOf('reconnect it') !== -1) newMsg = 'Controller reconnected — you can resume';
+    if (newMsg !== padDiscMsg) { padDiscMsg = newMsg; if (menuOpen) renderMenu(); }
+    if (lostNow && !menuOpen) openMenu();
+    p1pad = padAssign.p1 !== null && padAssign.p1 >= 0 ? padByIndex(padAssign.p1) : null;
+    p2pad = padByIndex(padAssign.p2);
+    p3pad = padByIndex(padAssign.p3);
   }
+  // keep the setup screen's controller status + start-button state fresh
+  if ((!running || gameOver) && overlay.style.display !== 'none') updatePadStatus();
   if (pad) {
     // + button: start from the title, or open/close the pause menu in-game
     var plus = pad.buttons[9] && pad.buttons[9].pressed;
     if (plus && !padStartPrev) {
-      if (!running || gameOver) { if (!initialsActive && !rulesOpen) startGame(); }
+      if (!running || gameOver) {
+        if (canStartGame()) startGame();
+        else if (!initialsActive && !rulesOpen && !menuOpen) flashStartHint();
+      }
       else if (menuOpen) menuAction('resume', true);
       else openMenu();
     }
@@ -1793,6 +2286,8 @@ function animate() {
         spectate(player3, p3pad, camera3, dt);
       }
     }
+    // targeting previews for held Trap Wall / Turbo Toot
+    updatePreviews();
 
     // bombs
     bombs.slice().forEach(function (b) {
@@ -1894,6 +2389,7 @@ function animate() {
         u.mesh.material.color.setHSL((now / 600) % 1, 1, 0.55);
         u.mesh.material.emissive.setHSL((now / 600) % 1, 1, 0.35);
       }
+      var consumed = false;
       humans().some(function (p) {
         if (!p.alive) return false;
         var pt = tileOf(p);
@@ -1907,16 +2403,45 @@ function animate() {
           p.beansTime = 6;
           p.trailTile = tileOf(p);
           snd(500, 0.1, 'sine'); snd(330, 0.18, 'sine');
-        } else if (!p.held) {
-          p.held = u.type;
+        } else if (u.type === 'bomb') {
+          // passive: applies instantly; at the cap it stays on the floor
+          if (p.maxBombs >= MAX_GAS) { cappedFx(p, 'Gas full', 'cap'); return true; }
+          p.maxBombs++;
+          snd(660, 0.15, 'sine');
+        } else if (u.type === 'range') {
+          if (p.range >= MAX_BLAST) { cappedFx(p, 'Blast full', 'cap'); return true; }
+          p.range++;
+          snd(660, 0.15, 'sine');
+        } else if (u.type === 'speed') {
+          if (p.speed >= MAX_SPEED - 0.001) { cappedFx(p, 'Speed full', 'cap'); return true; }
+          p.speed = Math.min(MAX_SPEED, p.speed + SPEED_STEP);
           snd(660, 0.15, 'sine');
         } else {
-          snd(150, 0.25, 'sine');   // hands full — this one fizzles away
+          // active held item (wall/spray/turbo): hands full? it stays on the floor
+          if (p.held) { cappedFx(p, 'Item slot full', 'slot'); return true; }
+          p.held = u.type;
+          snd(660, 0.15, 'sine');
         }
+        consumed = true;
         scene.remove(u.mesh);
         powerups.splice(powerups.indexOf(u), 1);
         return true;
       });
+      // bots collect PASSIVE upgrades only — never held items, beans, or extra lives
+      if (!consumed && (u.type === 'bomb' || u.type === 'range' || u.type === 'speed')) {
+        for (var ubi = 0; ubi < bots.length; ubi++) {
+          var ubb = bots[ubi];
+          if (!ubb.alive || ubb.gx !== u.gx || ubb.gz !== u.gz) continue;
+          if (!botWantsPU(ubb, u)) break;   // capped: walk over it, leave it
+          if (u.type === 'bomb') ubb.maxBombs++;
+          else if (u.type === 'range') ubb.range++;
+          else ubb.speed = Math.min(MAX_SPEED, ubb.speed + SPEED_STEP);
+          snd(660, 0.1, 'sine');
+          scene.remove(u.mesh);
+          powerups.splice(powerups.indexOf(u), 1);
+          break;
+        }
+      }
     });
     // bots
     bots.forEach(function (bot) {
@@ -1926,7 +2451,12 @@ function animate() {
         if (bot.blindTime <= 0) { bot.blindTime = 0; removeBlindCloud(bot); }
       }
       if (bot.hitCd > 0) bot.hitCd -= dt;
-      if (bot.boss) bot.mesh.scale.setScalar(bot.hitCd > 0.45 ? 2.5 : 2.2);   // flinch when hit
+      if (bot.boss) {
+        var bscale = bot.hitCd > 0.45 ? 2.5 : 2.2;                  // flinch when hit
+        if (bot.phase === 2) bscale += 0.06 + Math.sin(now / 130) * 0.1;   // enraged: stronger pulsing
+        bot.mesh.scale.setScalar(bscale);
+        if (bot.phase === 2) updateBossSpecial(bot, dt);
+      }
       botThink(bot, dt);
       if (bot.moving) {
         var c = tileCenter(bot.tx, bot.tz);
@@ -1956,9 +2486,11 @@ function animate() {
             bot.hitCd = 0.6;
             snd(85, 0.35, 'sawtooth');
             if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;
+            if (bot.hp > 0 && bot.phase === 1 && bot.hp <= 500) enrageBoss(bot);   // phase 2 triggers ONCE at half health
             if (bot.hp <= 0) {
               bot.alive = false;
               scene.remove(bot.mesh);
+              clearBossWarnings();
               snd(60, 0.8, 'sawtooth'); snd(40, 1.0, 'triangle');
               if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 1000;   // boss bonus!
             }
@@ -2013,8 +2545,8 @@ function animate() {
         var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
         showLevelMsg(wname + ' wins the round!');
         snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
-        setTimeout(function () {
-          if (!transitioning) return;   // player quit during the transition
+        later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+          if (!transitioning) return;   // belt-and-braces: player quit during the transition
           level++;
           startLevel(true);
           showLevelMsg(level % 10 === 0
@@ -2030,8 +2562,8 @@ function animate() {
         player.score += 500;   // 500 point bonus for winning the level
         showLevelMsg('Level ' + level + ' cleared! +500');
         snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
-        setTimeout(function () {
-          if (!transitioning) return;   // player quit during the transition
+        later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+          if (!transitioning) return;   // belt-and-braces: player quit during the transition
           level++;
           startLevel(true);
           showLevelMsg(level % 10 === 0
@@ -2171,6 +2703,9 @@ camera.position.set(COLS * TS / 2, 22, ROWS * TS + 10);
 camera.lookAt(COLS * TS / 2, 0, ROWS * TS / 2);
 renderScoreboard();
 renderTitleFocus();
+updatePadStatus();
+window.addEventListener('gamepadconnected', function () { updatePadStatus(); });
+window.addEventListener('gamepaddisconnected', function () { updatePadStatus(); });
 animate();
 
 window.addEventListener('resize', function () {
