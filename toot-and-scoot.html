@@ -78,6 +78,18 @@
   #hudTL { top: 14px; left: 14px; }
   #hudTR { top: 14px; right: 14px; }
   #hudP3 { bottom: 14px; left: 14px; display: none; }
+  #bossbar {
+    position: fixed; top: 108px; left: 50%; transform: translateX(-50%);
+    width: 420px; text-align: center; z-index: 5; pointer-events: none;
+  }
+  #bossname {
+    font-family: 'Arial Black', Arial, sans-serif; font-size: 17px; color: #ff8a65;
+    text-shadow: 2px 2px 0 #000; letter-spacing: 2px; margin-bottom: 4px;
+  }
+  #bosstrack {
+    height: 18px; background: rgba(0,0,0,0.55); border: 3px solid #fff; border-radius: 10px; overflow: hidden;
+  }
+  #bossfill { height: 100%; width: 100%; background: #e53935; }
   #minimap {
     position: fixed; right: 14px; bottom: 14px; z-index: 5;
     border: 3px solid rgba(255,255,255,0.75); border-radius: 8px;
@@ -121,6 +133,7 @@
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
   <p>Levels 3 and 5 have emergency teleporters: get boxed in by crates and you'll be beamed out. No rescue from trap walls or the Dutch Oven!</p>
+  <p>Every 10th level: BOSS FIGHT! The Big Stinker has 1000 health — every fart blast does 100 damage. All your abilities work on him. Good luck!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
   <p>Superpower on X (or Q): a different one every level, with a 30 second cooldown between uses! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
@@ -198,6 +211,10 @@
   </div>
   <div class="hpanel" id="hudP3"></div>
   <canvas id="minimap" width="150" height="130"></canvas>
+  <div id="bossbar" style="display:none">
+    <div id="bossname">THE BIG STINKER</div>
+    <div id="bosstrack"><div id="bossfill"></div></div>
+  </div>
   <div id="slots">
     <div class="slotbox" id="slotA">
       <div class="slotname" id="slotAName">&mdash;</div>
@@ -588,7 +605,9 @@ var worldMeshes = [];
 function buildWorld() {
   clearGroup(worldMeshes); worldMeshes = [];
   crateMeshes = {};
-  currentMaze = MAZES[(level - 1) % MAZES.length];
+  currentMaze = (level % 10 === 0)
+    ? { name: 'Boss arena', shape: 'rect', pillars: 'dots', crate: 0.4 }
+    : MAZES[(level - 1) % MAZES.length];
   grid = [];
   for (var z = 0; z < ROWS; z++) {
     grid[z] = [];
@@ -641,6 +660,7 @@ function removeCrate(x, z) {
 // ---------- entities ----------
 // ---------- hats ----------
 var HATMAP = {
+  'The Big Stinker': 'crown',
   'Sir Toots-a-Lot': 'tophat',
   'Stinky Pete': 'cowboy2',
   'Windy Wendy': 'propeller',
@@ -872,12 +892,25 @@ function startLevel(keepStats) {
   document.getElementById('minimap').style.display = numPlayers === 3 ? 'none' : 'block';
 
   var spawns = levelSpawns.slice(numPlayers);
-  var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
-  for (var i = 0; i < levelParams.botCount; i++) {
-    var b = makeBot(spawns[i][0], spawns[i][1], botDefs[i][0], botDefs[i][1]);
-    b.speed = levelParams.botSpeed;
-    b.range = levelParams.botRange;
-    bots.push(b);
+  if (level % 10 === 0) {
+    // BOSS FIGHT: one giant rival with 1000 health
+    var bs = spawns[0] || [7, 6];
+    var bossBot = makeBot(bs[0], bs[1], 0x4e342e, 'The Big Stinker');
+    bossBot.mesh.scale.set(2.2, 2.2, 2.2);
+    bossBot.boss = true;
+    bossBot.hp = 1000;
+    bossBot.speed = 3.2;
+    bossBot.range = 4;
+    bossBot.maxBombs = 2;
+    bots.push(bossBot);
+  } else {
+    var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
+    for (var i = 0; i < levelParams.botCount; i++) {
+      var b = makeBot(spawns[i][0], spawns[i][1], botDefs[i][0], botDefs[i][1]);
+      b.speed = levelParams.botSpeed;
+      b.range = levelParams.botRange;
+      bots.push(b);
+    }
   }
   running = true; gameOver = false;
   overlay.style.display = 'none';
@@ -940,7 +973,8 @@ var FARTS = {
   'Windy Wendy':     { base: 185, sputter: 12, dur: 0.65, tone: 900 },   // high and whistly
   'Princess Poot':   { base: 240, sputter: 24, dur: 0.28, tone: 1100 },  // dainty little squeak
   'Gassy Gus':       { base: 52,  sputter: 6,  dur: 1.1,  tone: 260 },   // deep rumble
-  'Captain Cheeks':  { base: 112, sputter: 42, dur: 0.6,  tone: 500 }    // machine-gun putt-putt
+  'Captain Cheeks':  { base: 112, sputter: 42, dur: 0.6,  tone: 500 },   // machine-gun putt-putt
+  'The Big Stinker': { base: 38,  sputter: 5,  dur: 1.5,  tone: 190 }    // the boss: an earthquake
 };
 function ownerProfile(owner) {
   return (owner && owner.name && FARTS[owner.name]) || FARTS.player;
@@ -1825,6 +1859,8 @@ function animate() {
         bot.blindTime -= dt;
         if (bot.blindTime <= 0) { bot.blindTime = 0; removeBlindCloud(bot); }
       }
+      if (bot.hitCd > 0) bot.hitCd -= dt;
+      if (bot.boss) bot.mesh.scale.setScalar(bot.hitCd > 0.45 ? 2.5 : 2.2);   // flinch when hit
       botThink(bot, dt);
       if (bot.moving) {
         var c = tileCenter(bot.tx, bot.tz);
@@ -1847,10 +1883,26 @@ function animate() {
         explosions.forEach(function (e2) { if (e2.gx === t[0] && e2.gz === t[1]) hitE = e2; });
       });
       if (hitE) {
-        bot.alive = false;
-        scene.remove(bot.mesh);
-        snd(120, 0.5, 'triangle');
-        if (!twoPlayer && hitE.owner === player) player.score += 100;   // 100 points per rival YOU gassed
+        if (bot.boss) {
+          // the boss takes 100 damage per blast (not from his own farts)
+          if ((bot.hitCd || 0) <= 0 && hitE.owner !== bot) {
+            bot.hp -= 100;
+            bot.hitCd = 0.6;
+            snd(85, 0.35, 'sawtooth');
+            if (!twoPlayer && hitE.owner === player) player.score += 100;
+            if (bot.hp <= 0) {
+              bot.alive = false;
+              scene.remove(bot.mesh);
+              snd(60, 0.8, 'sawtooth'); snd(40, 1.0, 'triangle');
+              if (!twoPlayer && hitE.owner === player) player.score += 1000;   // boss bonus!
+            }
+          }
+        } else {
+          bot.alive = false;
+          scene.remove(bot.mesh);
+          snd(120, 0.5, 'triangle');
+          if (!twoPlayer && hitE.owner === player) player.score += 100;   // 100 points per rival YOU gassed
+        }
       }
     });
     // player hit?
@@ -1883,7 +1935,9 @@ function animate() {
         setTimeout(function () {
           level++;
           startLevel(true);
-          showLevelMsg('Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+          showLevelMsg(level % 10 === 0
+            ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+            : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
           transitioning = false;
         }, 1700);
       }
@@ -1897,7 +1951,9 @@ function animate() {
         setTimeout(function () {
           level++;
           startLevel(true);
-          showLevelMsg('Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+          showLevelMsg(level % 10 === 0
+            ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+            : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
           transitioning = false;
         }, 1700);
       }
@@ -1940,6 +1996,11 @@ function animate() {
     }
 
     var aliveBots = bots.filter(function (b) { return b.alive; }).length;
+    // boss health bar
+    var bossAlive = null;
+    bots.forEach(function (b) { if (b.boss && b.alive) bossAlive = b; });
+    document.getElementById('bossbar').style.display = bossAlive ? 'block' : 'none';
+    if (bossAlive) document.getElementById('bossfill').style.width = Math.max(0, bossAlive.hp / 10) + '%';
     var puNames = PU_NAME, puColors = PU_COLOR;
     if (twoPlayer) {
       document.getElementById('hudTL').innerHTML = twoPHudHtml('Player 1', '#64b5f6', player);
