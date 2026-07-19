@@ -134,6 +134,7 @@
   <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
   <p>Levels 3 and 5 have emergency teleporters: get boxed in by crates and you'll be beamed out. No rescue from trap walls or the Dutch Oven!</p>
   <p>Every 10th level: BOSS FIGHT! The Big Stinker has 1000 health — every fart blast does 100 damage. All your abilities work on him. Good luck!</p>
+  <p>Legendary find (2% chance): the <b style="color:#ff80ab">r</b><b style="color:#ffab40">a</b><b style="color:#fff176">i</b><b style="color:#69f0ae">n</b><b style="color:#40c4ff">b</b><b style="color:#b388ff">o</b><b style="color:#ff80ab">w</b> — grab it for an EXTRA LIFE!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
   <p>Superpower on X (or Q): a different one every level, with a 30 second cooldown between uses! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
@@ -827,6 +828,8 @@ function startLevel(keepStats) {
   var prevW1 = keepStats && player ? (player.wins || 0) : 0;
   var prevW2 = keepStats && player2 ? (player2.wins || 0) : 0;
   var prevW3 = keepStats && player3 ? (player3.wins || 0) : 0;
+  var prevL2 = keepStats && player2 ? (player2.lives || 0) : 0;
+  var prevL3 = keepStats && player3 ? (player3.lives || 0) : 0;
   var c = tileCenter(levelSpawns[0][0], levelSpawns[0][1]);
   var prev = keepStats && !twoPlayer && player ? player : null;
   player = {
@@ -838,6 +841,7 @@ function startLevel(keepStats) {
     held:     prev ? prev.held     : null,
     score:    prev ? prev.score    : 0,
     wins:     prevW1,
+    lives:    keepStats && player ? (player.lives || 0) : 0,
     maskTime: 0,
     superType: superType,
     superCd: 0
@@ -849,7 +853,7 @@ function startLevel(keepStats) {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
-      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2,
+      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2, lives: prevL2,
       maskTime: 0, superType: superType, superCd: 0
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
@@ -861,7 +865,7 @@ function startLevel(keepStats) {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
-        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3,
+        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3, lives: prevL3,
         maskTime: 0, superType: superType, superCd: 0
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
@@ -1105,6 +1109,15 @@ function explosionAt(x, z) {
   return false;
 }
 function spawnPowerup(x, z) {
+  if (Math.random() < 0.02) {
+    // the ultra-rare rainbow: an extra life!
+    var rm = new THREE.Mesh(puGeo, new THREE.MeshLambertMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.4 }));
+    var rc = tileCenter(x, z);
+    rm.position.set(rc.x, 0.6, rc.z);
+    scene.add(rm);
+    powerups.push({ gx: x, gz: z, type: 'rainbow', mesh: rm });
+    return;
+  }
   if (Math.random() < 0.10) {
     // the rare can of beans!
     var bm = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.52, 10),
@@ -1605,6 +1618,7 @@ function twoPHudHtml(label, col, p) {
   var item = p.held ? PU_NAME[p.held] : '—';
   return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + '</div>' +
     '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range +
+      (p.lives > 0 ? ' · Lives ' + p.lives : '') +
       (p.beansTime > 0 ? ' · BEANS ' + Math.ceil(p.beansTime) + 's!' : '') :
       'KNOCKED OUT' + (p.specName ? ' — watching ' + p.specName : '') + ' (A = switch)') + '</div>' +
     '<div class="hsub">Item (A): ' + item + '</div>' +
@@ -1832,11 +1846,19 @@ function animate() {
     powerups.slice().forEach(function (u) {
       u.mesh.rotation.y += dt * 2.5;
       u.mesh.position.y = 0.6 + Math.sin(now / 300) * 0.12;
+      if (u.type === 'rainbow') {
+        u.mesh.material.color.setHSL((now / 600) % 1, 1, 0.55);
+        u.mesh.material.emissive.setHSL((now / 600) % 1, 1, 0.35);
+      }
       humans().some(function (p) {
         if (!p.alive) return false;
         var pt = tileOf(p);
         if (pt.x !== u.gx || pt.z !== u.gz) return false;
-        if (u.type === 'beans') {
+        if (u.type === 'rainbow') {
+          // extra life!
+          p.lives = (p.lives || 0) + 1;
+          snd(523, 0.12, 'sine'); snd(659, 0.12, 'sine'); snd(784, 0.25, 'sine');
+        } else if (u.type === 'beans') {
           // eat them on the spot: fart trail for 6 seconds!
           p.beansTime = 6;
           p.trailTile = tileOf(p);
@@ -1907,10 +1929,18 @@ function animate() {
     });
     // player hit?
     // did anyone get gassed?
-    humans().forEach(function (p) {
+    humans().forEach(function (p, hIdx) {
       if (!p.alive || transitioning || p.maskTime > 0) return;
       var t = tileOf(p);
       if (explosionAt(t.x, t.z)) {
+        if (p.lives > 0) {
+          // the rainbow saves you: spend a life, flash invincible for 2 seconds
+          p.lives--;
+          p.maskTime = 2;
+          showLevelMsg((twoPlayer ? 'Player ' + (hIdx + 1) : 'You') + ' used an extra life!');
+          snd(784, 0.12, 'sine'); snd(523, 0.2, 'sine');
+          return;
+        }
         p.alive = false;
         scene.remove(p.mesh);
         if (!twoPlayer) {
@@ -2012,6 +2042,7 @@ function animate() {
     document.getElementById('hLevel').textContent = level;
     document.getElementById('hDiff').textContent = ['Easy', 'Medium', 'Hard'][difficulty];
     document.getElementById('hScore').textContent = 'Score ' + player.score +
+      (player.lives > 0 ? ' · Lives ' + player.lives : '') +
       (player.beansTime > 0 ? ' · BEANS ' + Math.ceil(player.beansTime) + 's!' : '');
     document.getElementById('hRivals').textContent = aliveBots;
     document.getElementById('hGas').textContent = player.maxBombs;
