@@ -114,7 +114,7 @@
   <p>A fart lingers for a moment, then spreads FAST. Toot and scoot!</p>
   <p>Power-ups: <b style="color:#ffab40">orange = more gas</b> &middot; <b style="color:#ff5252">red = bigger blast</b> &middot; <b style="color:#40c4ff">blue = Super Scoot</b> &middot; <b style="color:#66bb6a">green = trap wall</b> &middot; <b style="color:#eceff1">white = air spray</b> &middot; <b style="color:#ce93d8">purple = Turbo Toot</b></p>
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
-  <p>Rare find (5% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
+  <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
   <p>Superpower on X (or Q): a different one every level, with a 30 second cooldown between uses! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
@@ -1056,7 +1056,7 @@ function explosionAt(x, z) {
   return false;
 }
 function spawnPowerup(x, z) {
-  if (Math.random() < 0.05) {
+  if (Math.random() < 0.10) {
     // the rare can of beans!
     var bm = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.52, 10),
       new THREE.MeshLambertMaterial({ color: 0x8d5524, emissive: 0xbf360c, emissiveIntensity: 0.3 }));
