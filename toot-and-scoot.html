@@ -78,6 +78,11 @@
   #hudTL { top: 14px; left: 14px; }
   #hudTR { top: 14px; right: 14px; }
   #hudP3 { bottom: 14px; left: 14px; display: none; }
+  #minimap {
+    position: fixed; right: 14px; bottom: 14px; z-index: 5;
+    border: 3px solid rgba(255,255,255,0.75); border-radius: 8px;
+    background: rgba(10, 15, 35, 0.6);
+  }
   .hlabel { font-size: 14px; letter-spacing: 2px; color: #ffd54f; text-transform: uppercase; text-shadow: 1px 1px 0 #000; }
   .hbig { font-size: 42px; line-height: 1.05; text-shadow: 3px 3px 0 #000; }
   .hsub { font-size: 13px; color: #b3e5fc; text-shadow: 1px 1px 0 #000; }
@@ -188,6 +193,7 @@
     <div class="hbig" id="hRivals">0</div>
   </div>
   <div class="hpanel" id="hudP3"></div>
+  <canvas id="minimap" width="150" height="130"></canvas>
   <div id="slots">
     <div class="slotbox" id="slotA">
       <div class="slotname" id="slotAName">&mdash;</div>
@@ -723,7 +729,7 @@ function makeBot(gx, gz, color, name) {
   group.position.set(c.x, 0, c.z);
   scene.add(group);
   return { gx: gx, gz: gz, tx: gx, tz: gz, moving: false, mesh: group, name: name,
-    alive: true, speed: 3.4, maxBombs: 1, range: 2, timer: 0 };
+    color: color, alive: true, speed: 3.4, maxBombs: 1, range: 2, timer: 0 };
 }
 
 function makePlayerMesh(color, hat) {
@@ -855,6 +861,8 @@ function startLevel(keepStats) {
   hudroot.style.display = 'block';
   maskoverlay.style.display = 'none';
   for (var bl = 0; bl < 3; bl++) document.getElementById('blind' + bl).style.display = 'none';
+  // in 3-player the bottom-right quadrant already has the bird's-eye camera
+  document.getElementById('minimap').style.display = numPlayers === 3 ? 'none' : 'block';
 
   var spawns = levelSpawns.slice(numPlayers);
   var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
@@ -1830,6 +1838,42 @@ function animate() {
           transitioning = false;
         }, 1700);
       }
+    }
+
+    // minimap: walls, crates, farts, power-ups, and everyone's position
+    if (numPlayers !== 3) {
+      var mmv = document.getElementById('minimap');
+      var mc = mmv.getContext('2d');
+      var mts = 10;
+      mc.clearRect(0, 0, mmv.width, mmv.height);
+      for (var mz = 0; mz < ROWS; mz++) {
+        for (var mxx = 0; mxx < COLS; mxx++) {
+          var mg = grid[mz][mxx];
+          if (!mg) continue;
+          mc.fillStyle = mg === 1 ? '#7986cb' : mg === 2 ? '#efe8d8' : '#66bb6a';
+          mc.fillRect(mxx * mts, mz * mts, mts - 1, mts - 1);
+        }
+      }
+      bombs.forEach(function (b) {
+        if (b.hidden) return;
+        mc.fillStyle = '#558b2f';
+        mc.beginPath(); mc.arc(b.gx * mts + 5, b.gz * mts + 5, 3.5, 0, 7); mc.fill();
+      });
+      powerups.forEach(function (u) {
+        mc.fillStyle = u.type === 'beans' ? '#a1662f' : '#ffd54f';
+        mc.fillRect(u.gx * mts + 3, u.gz * mts + 3, 4, 4);
+      });
+      bots.forEach(function (b) {
+        if (!b.alive) return;
+        mc.fillStyle = '#' + ('00000' + b.color.toString(16)).slice(-6);
+        mc.beginPath(); mc.arc(b.mesh.position.x / TS * mts, b.mesh.position.z / TS * mts, 3.5, 0, 7); mc.fill();
+      });
+      humans().forEach(function (p) {
+        if (!p.alive) return;
+        mc.fillStyle = '#' + ('00000' + p.baseColor.toString(16)).slice(-6);
+        mc.beginPath(); mc.arc(p.x / TS * mts, p.z / TS * mts, 4.5, 0, 7); mc.fill();
+        mc.strokeStyle = '#fff'; mc.lineWidth = 1.5; mc.stroke();
+      });
     }
 
     var aliveBots = bots.filter(function (b) { return b.alive; }).length;
