@@ -1838,6 +1838,12 @@ function animate() {
         p.trailTile = bt;
       }
     });
+    // holding an Extalife makes your avatar shimmer rainbow
+    humans().forEach(function (p) {
+      if (!p.alive || p.maskTime > 0) return;   // the gas mask gray takes priority
+      if (p.lives > 0) p.mesh.userData.mat.color.setHSL((now / 700) % 1, 0.9, 0.55);
+      else p.mesh.userData.mat.color.setHex(p.baseColor);
+    });
     // gas mask timers: gray while worn, blinks before wearing off
     humans().forEach(function (p) {
       if (p.maskTime <= 0) return;
