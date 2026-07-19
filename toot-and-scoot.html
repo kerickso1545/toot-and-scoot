@@ -561,14 +561,16 @@ function closeMenus() {
 function menuAction(act, fromPad) {
   if (act === 'resume') {
     closeMenus();
-    padBombPrev = true; padUsePrev = true;   // don't let the resume press drop a bomb
+    humans().forEach(function (h) { h.prevBomb = true; h.prevUse = true; h.prevMask = true; });   // don't let the resume press drop a bomb
     if (!fromPad) renderer.domElement.requestPointerLock();
   } else if (act === 'settings') { menuScreen = 'settings'; menuIndex = 0; renderMenu(); }
   else if (act === 'back') { menuScreen = 'pause'; menuIndex = 1; renderMenu(); }
   else if (act === 'quit') {
     closeMenus();
-    running = false; gameOver = true;
+    running = false; gameOver = true; transitioning = false;
     hudroot.style.display = 'none';
+    maskoverlay.style.display = 'none';
+    for (var qb = 0; qb < 3; qb++) document.getElementById('blind' + qb).style.display = 'none';
     bigmsg.textContent = '';
     overlay.style.display = 'flex';
     diffbtns.style.display = 'block';
@@ -886,6 +888,7 @@ function startLevel(keepStats) {
   var prevW3 = keepStats && player3 ? (player3.wins || 0) : 0;
   var prevL2 = keepStats && player2 ? (player2.lives || 0) : 0;
   var prevL3 = keepStats && player3 ? (player3.lives || 0) : 0;
+  var prevS1 = keepStats && player ? (player.score || 0) : 0;
   var prevS2 = keepStats && player2 ? (player2.score || 0) : 0;
   var prevS3 = keepStats && player3 ? (player3.score || 0) : 0;
   var c = tileCenter(levelSpawns[0][0], levelSpawns[0][1]);
@@ -897,7 +900,7 @@ function startLevel(keepStats) {
     maxBombs: prev ? prev.maxBombs : 1,
     range:    prev ? prev.range    : 2,
     held:     prev ? prev.held     : null,
-    score:    prev ? prev.score    : 0,
+    score:    prev ? prev.score    : prevS1,
     wins:     prevW1,
     lives:    keepStats && player ? (player.lives || 0) : 0,
     stamina:  100,
@@ -967,7 +970,8 @@ function startLevel(keepStats) {
   } else {
     var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
     for (var i = 0; i < levelParams.botCount; i++) {
-      var b = makeBot(spawns[i][0], spawns[i][1], botDefs[i][0], botDefs[i][1]);
+      var sp = spawns.length ? spawns[i % spawns.length] : [7, 6];   // more bots than spawn pockets: reuse
+      var b = makeBot(sp[0], sp[1], botDefs[i][0], botDefs[i][1]);
       b.speed = levelParams.botSpeed;
       b.range = levelParams.botRange;
       bots.push(b);
@@ -1571,9 +1575,11 @@ document.addEventListener('keyup', function (e) { keys[e.code] = false; });
 document.addEventListener('mousedown', function () { if (locked) dropBombFor(player); });
 
 function endGame(text) {
-  gameOver = true; running = false;
+  gameOver = true; running = false; transitioning = false;
   closeMenus();
   hudroot.style.display = 'none';
+  maskoverlay.style.display = 'none';
+  for (var eb = 0; eb < 3; eb++) document.getElementById('blind' + eb).style.display = 'none';
   bigmsg.textContent = text;
   setTimeout(function () {
     if (document.pointerLockElement) document.exitPointerLock();
@@ -1729,7 +1735,7 @@ function animate() {
     // + button: start from the title, or open/close the pause menu in-game
     var plus = pad.buttons[9] && pad.buttons[9].pressed;
     if (plus && !padStartPrev) {
-      if (!running || gameOver) startGame();
+      if (!running || gameOver) { if (!initialsActive && !rulesOpen) startGame(); }
       else if (menuOpen) menuAction('resume', true);
       else openMenu();
     }
@@ -2008,6 +2014,7 @@ function animate() {
         showLevelMsg(wname + ' wins the round!');
         snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
         setTimeout(function () {
+          if (!transitioning) return;   // player quit during the transition
           level++;
           startLevel(true);
           showLevelMsg(level % 10 === 0
@@ -2024,6 +2031,7 @@ function animate() {
         showLevelMsg('Level ' + level + ' cleared! +500');
         snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
         setTimeout(function () {
+          if (!transitioning) return;   // player quit during the transition
           level++;
           startLevel(true);
           showLevelMsg(level % 10 === 0
