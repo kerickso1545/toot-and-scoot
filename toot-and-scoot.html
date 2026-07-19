@@ -1421,7 +1421,13 @@ document.addEventListener('keydown', function (e) {
     return;
   }
   keys[e.code] = true;
-  if (e.code === 'Space') { e.preventDefault(); if (locked) dropBombFor(player); }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (locked) {
+      if (player && !player.alive && twoPlayer) { player.spec = (player.spec || 0) + 1; }
+      else dropBombFor(player);
+    }
+  }
   if (e.code === 'KeyE') usePowerupFor(player);
   if (e.code === 'KeyQ') useSuperFor(player);
 });
@@ -1493,13 +1499,41 @@ function placeCam(cam, p) {
   cam.lookAt(p.x, 1.1, p.z);
 }
 
+function spectate(p, pd, cam, dt) {
+  // knocked out: follow someone else — A cycles targets, right stick orbits
+  var targets = [], names = [];
+  humans().forEach(function (h, i) {
+    if (h !== p && h.alive) { targets.push(h); names.push('Player ' + (i + 1)); }
+  });
+  bots.forEach(function (b) {
+    if (b.alive) { targets.push(b); names.push(b.name); }
+  });
+  if (!targets.length) return;
+  if (p.spec === undefined) p.spec = 0;
+  if (pd) {
+    var aP = (pd.buttons[0] && pd.buttons[0].pressed) || (pd.buttons[1] && pd.buttons[1].pressed);
+    if (aP && !p.prevBomb) p.spec++;
+    p.prevBomb = aP;
+    var sens = camSpeeds[camSpeedIdx];
+    var rx = pd.axes[2] || 0, ry = pd.axes[3] || 0;
+    if (Math.abs(rx) > 0.2) p.yaw -= rx * 2.8 * sens * dt;
+    if (Math.abs(ry) > 0.2) p.pitch = Math.max(0.25, Math.min(1.25, p.pitch + ry * 1.8 * sens * dt));
+  }
+  var idx = p.spec % targets.length;
+  var t = targets[idx];
+  p.specName = names[idx];
+  var pos = t.x !== undefined ? { x: t.x, z: t.z } : { x: t.mesh.position.x, z: t.mesh.position.z };
+  placeCam(cam, { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch });
+}
+
 function superStateText(p) {
   return p.maskTime > 0 ? Math.ceil(p.maskTime) + 's' : p.superCd > 0 ? 'wait ' + Math.ceil(p.superCd) + 's' : SUPER_SHORT[p.superType];
 }
 function twoPHudHtml(label, col, p) {
   var item = p.held ? PU_NAME[p.held] : '—';
   return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + '</div>' +
-    '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range : 'KNOCKED OUT') + '</div>' +
+    '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range :
+      'KNOCKED OUT' + (p.specName ? ' — watching ' + p.specName : '') + ' (A = switch)') + '</div>' +
     '<div class="hsub">Item (A): ' + item + '</div>' +
     '<div class="hsub">Super (X): ' + superStateText(p) + '</div>';
 }
@@ -1567,14 +1601,24 @@ function animate() {
     if (player.alive) {
       controlHuman(player, p1pad, true, dt);
       placeCam(camera, player);
+    } else if (twoPlayer) {
+      spectate(player, p1pad, camera, dt);
     }
-    if (twoPlayer && player2 && player2.alive) {
-      controlHuman(player2, p2pad, false, dt);
-      placeCam(camera2, player2);
+    if (twoPlayer && player2) {
+      if (player2.alive) {
+        controlHuman(player2, p2pad, false, dt);
+        placeCam(camera2, player2);
+      } else {
+        spectate(player2, p2pad, camera2, dt);
+      }
     }
-    if (twoPlayer && player3 && player3.alive) {
-      controlHuman(player3, p3pad, false, dt);
-      placeCam(camera3, player3);
+    if (twoPlayer && player3) {
+      if (player3.alive) {
+        controlHuman(player3, p3pad, false, dt);
+        placeCam(camera3, player3);
+      } else {
+        spectate(player3, p3pad, camera3, dt);
+      }
     }
 
     // bombs
