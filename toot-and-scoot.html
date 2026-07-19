@@ -139,7 +139,7 @@
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
   <p>Emergency teleporters: sealed in by unbreakable walls on ANY level and you'll be beamed out. On levels 3 and 5 crate traps count too. No rescue from trap walls or the Dutch Oven!</p>
-  <p>Stamina: you have 100 — running drains 10 per second, resting refills it. Run out and you're exhausted (half speed) until you catch your breath!</p>
+  <p>Sprint: hold Shift (keyboard) or click the left stick / left trigger (controller) for a speed burst. Sprinting drains stamina 10 per second; it refills when you're not sprinting. Run dry and you can't sprint until you catch your breath!</p>
   <p>Every 10th level: BOSS FIGHT! The Big Stinker has 1000 health — every fart blast does 100 damage. All your abilities work on him. Good luck!</p>
   <p>Legendary find (2% chance): the rainbow <b style="color:#ff80ab">E</b><b style="color:#ffab40">x</b><b style="color:#fff176">t</b><b style="color:#69f0ae">a</b><b style="color:#40c4ff">l</b><b style="color:#b388ff">i</b><b style="color:#ff80ab">f</b><b style="color:#ffab40">e</b> — grab it for an extra life!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
@@ -1566,14 +1566,20 @@ function controlHuman(p, pd, kb, dt) {
     if (Math.abs(ly) > 0.2) fwd -= ly;
   }
   var len = Math.max(1, Math.hypot(fwd, str));
-  // stamina: moving drains 10/sec, resting refills 25/sec; empty = exhausted (half speed) until 30
+  // sprinting: hold Shift (keyboard) or click the left stick / left trigger (controller).
+  // only sprinting drains stamina (10/sec); it refills (20/sec) whenever you're not sprinting.
+  // run dry and you're too tired to sprint until it comes back to 30.
   var moving = fwd !== 0 || str !== 0;
-  if (moving) p.stamina = Math.max(0, p.stamina - 10 * dt);
-  else p.stamina = Math.min(100, p.stamina + 25 * dt);
+  var wantSprint = false;
+  if (kb && (keys['ShiftLeft'] || keys['ShiftRight'])) wantSprint = true;
+  if (pd && ((pd.buttons[10] && pd.buttons[10].pressed) || (pd.buttons[6] && pd.buttons[6].pressed))) wantSprint = true;
+  var sprinting = wantSprint && moving && !p.exhausted;
+  if (sprinting) p.stamina = Math.max(0, p.stamina - 10 * dt);
+  else p.stamina = Math.min(100, p.stamina + 20 * dt);
   if (p.stamina <= 0) p.exhausted = true;
   else if (p.stamina >= 30) p.exhausted = false;
   var spd = p.speed * (p.beansTime > 0 || p.reviveTime > 0 ? 2 : 1);   // beans and extra-life revival: double speed
-  if (p.exhausted) spd *= 0.5;
+  if (sprinting) spd *= 1.6;
   var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * spd;
   var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * spd;
   var stuck = overlappingSolids(p.x, p.z);
