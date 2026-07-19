@@ -78,6 +78,12 @@
   #hudTL { top: 14px; left: 14px; }
   #hudTR { top: 14px; right: 14px; }
   #hudP3 { bottom: 14px; left: 14px; display: none; }
+  #stambar {
+    position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%);
+    width: 240px; height: 14px; z-index: 5; pointer-events: none;
+    background: rgba(0,0,0,0.5); border: 3px solid #fff; border-radius: 8px; overflow: hidden;
+  }
+  #stamfill { height: 100%; width: 100%; background: #66bb6a; }
   #bossbar {
     position: fixed; top: 108px; left: 50%; transform: translateX(-50%);
     width: 420px; text-align: center; z-index: 5; pointer-events: none;
@@ -133,6 +139,7 @@
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
   <p>Emergency teleporters: sealed in by unbreakable walls on ANY level and you'll be beamed out. On levels 3 and 5 crate traps count too. No rescue from trap walls or the Dutch Oven!</p>
+  <p>Stamina: you have 100 — running drains 10 per second, resting refills it. Run out and you're exhausted (half speed) until you catch your breath!</p>
   <p>Every 10th level: BOSS FIGHT! The Big Stinker has 1000 health — every fart blast does 100 damage. All your abilities work on him. Good luck!</p>
   <p>Legendary find (2% chance): the rainbow <b style="color:#ff80ab">E</b><b style="color:#ffab40">x</b><b style="color:#fff176">t</b><b style="color:#69f0ae">a</b><b style="color:#40c4ff">l</b><b style="color:#b388ff">i</b><b style="color:#ff80ab">f</b><b style="color:#ffab40">e</b> — grab it for an extra life!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
@@ -212,6 +219,7 @@
   </div>
   <div class="hpanel" id="hudP3"></div>
   <canvas id="minimap" width="150" height="130"></canvas>
+  <div id="stambar" style="display:none"><div id="stamfill"></div></div>
   <div id="bossbar" style="display:none">
     <div id="bossname">THE BIG STINKER</div>
     <div id="bosstrack"><div id="bossfill"></div></div>
@@ -842,6 +850,7 @@ function startLevel(keepStats) {
     score:    prev ? prev.score    : 0,
     wins:     prevW1,
     lives:    keepStats && player ? (player.lives || 0) : 0,
+    stamina:  100,
     maskTime: 0,
     superType: superType,
     superCd: 0
@@ -853,7 +862,7 @@ function startLevel(keepStats) {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
-      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2, lives: prevL2,
+      speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW2, lives: prevL2, stamina: 100,
       maskTime: 0, superType: superType, superCd: 0
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
@@ -865,7 +874,7 @@ function startLevel(keepStats) {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
-        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3, lives: prevL3,
+        speed: 5, maxBombs: 1, range: 2, held: null, wins: prevW3, lives: prevL3, stamina: 100,
         maskTime: 0, superType: superType, superCd: 0
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
@@ -886,6 +895,7 @@ function startLevel(keepStats) {
     document.getElementById('slots').style.display = 'flex';
     document.getElementById('hudBL').style.display = 'flex';
   }
+  document.getElementById('stambar').style.display = twoPlayer ? 'none' : 'block';
   hudroot.style.display = 'block';
   maskoverlay.style.display = 'none';
   for (var bl = 0; bl < 3; bl++) {
@@ -1556,7 +1566,14 @@ function controlHuman(p, pd, kb, dt) {
     if (Math.abs(ly) > 0.2) fwd -= ly;
   }
   var len = Math.max(1, Math.hypot(fwd, str));
+  // stamina: moving drains 10/sec, resting refills 25/sec; empty = exhausted (half speed) until 30
+  var moving = fwd !== 0 || str !== 0;
+  if (moving) p.stamina = Math.max(0, p.stamina - 10 * dt);
+  else p.stamina = Math.min(100, p.stamina + 25 * dt);
+  if (p.stamina <= 0) p.exhausted = true;
+  else if (p.stamina >= 30) p.exhausted = false;
   var spd = p.speed * (p.beansTime > 0 || p.reviveTime > 0 ? 2 : 1);   // beans and extra-life revival: double speed
+  if (p.exhausted) spd *= 0.5;
   var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * spd;
   var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * spd;
   var stuck = overlappingSolids(p.x, p.z);
@@ -1617,7 +1634,12 @@ function superStateText(p) {
 }
 function twoPHudHtml(label, col, p) {
   var item = p.held ? PU_NAME[p.held] : '—';
-  return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + '</div>' +
+  var stCol = p.stamina > 40 ? '#66bb6a' : p.stamina > 15 ? '#fdd835' : '#e53935';
+  var stBar = p.alive
+    ? '<div style="width:120px;height:8px;background:rgba(0,0,0,0.5);border:2px solid #fff;border-radius:5px;margin:5px auto 0;overflow:hidden">' +
+      '<div style="height:100%;width:' + Math.round(p.stamina) + '%;background:' + stCol + '"></div></div>'
+    : '';
+  return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + '</div>' + stBar +
     '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range +
       (p.lives > 0 ? ' · Lives ' + p.lives : '') +
       (p.beansTime > 0 ? ' · BEANS ' + Math.ceil(p.beansTime) + 's!' : '') :
@@ -2035,6 +2057,12 @@ function animate() {
     }
 
     var aliveBots = bots.filter(function (b) { return b.alive; }).length;
+    // stamina bar (1P)
+    if (!twoPlayer) {
+      var sf = document.getElementById('stamfill');
+      sf.style.width = Math.round(player.stamina) + '%';
+      sf.style.background = player.stamina > 40 ? '#66bb6a' : player.stamina > 15 ? '#fdd835' : '#e53935';
+    }
     // boss health bar
     var bossAlive = null;
     bots.forEach(function (b) { if (b.boss && b.alive) bossAlive = b; });
