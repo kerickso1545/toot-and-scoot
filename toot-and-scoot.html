@@ -120,6 +120,7 @@
   <p>Power-ups: <b style="color:#ffab40">orange = more gas</b> &middot; <b style="color:#ff5252">red = bigger blast</b> &middot; <b style="color:#40c4ff">blue = Super Scoot</b> &middot; <b style="color:#66bb6a">green = trap wall</b> &middot; <b style="color:#eceff1">white = air spray</b> &middot; <b style="color:#ce93d8">purple = Turbo Toot</b></p>
   <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Rare find (10% chance): <b style="color:#bcaaa4">the can of beans</b> — eat it and for 6 seconds every tile you walk on leaves a fart behind you. Run fast!</p>
+  <p>Levels 2 and 5 have emergency teleporters: get fully trapped and you'll be beamed to a random spot!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
   <p>Superpower on X (or Q): a different one every level, with a 30 second cooldown between uses! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
@@ -182,6 +183,9 @@
 <div id="blind0" class="blindfx">STINKED!</div>
 <div id="blind1" class="blindfx">STINKED!</div>
 <div id="blind2" class="blindfx">STINKED!</div>
+<div id="tele0" class="blindfx" style="color:#80d8ff">TELEPORTED!</div>
+<div id="tele1" class="blindfx" style="color:#80d8ff">TELEPORTED!</div>
+<div id="tele2" class="blindfx" style="color:#80d8ff">TELEPORTED!</div>
 <div id="hudroot" style="display:none">
   <div class="hpanel" id="hudTL">
     <div class="hlabel">Level</div>
@@ -860,7 +864,10 @@ function startLevel(keepStats) {
   }
   hudroot.style.display = 'block';
   maskoverlay.style.display = 'none';
-  for (var bl = 0; bl < 3; bl++) document.getElementById('blind' + bl).style.display = 'none';
+  for (var bl = 0; bl < 3; bl++) {
+    document.getElementById('blind' + bl).style.display = 'none';
+    document.getElementById('tele' + bl).style.display = 'none';
+  }
   // in 3-player the bottom-right quadrant already has the bird's-eye camera
   document.getElementById('minimap').style.display = numPlayers === 3 ? 'none' : 'block';
 
@@ -1549,6 +1556,14 @@ function spectate(p, pd, cam, dt) {
   placeCam(cam, { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch });
 }
 
+function viewRect(p) {
+  if (!twoPlayer) return { l: 0, t: 0, w: 100, h: 100 };
+  if (numPlayers === 2) return p === player ? { l: 0, t: 0, w: 50, h: 100 } : { l: 50, t: 0, w: 50, h: 100 };
+  if (p === player) return { l: 0, t: 0, w: 50, h: 50 };
+  if (p === player2) return { l: 50, t: 0, w: 50, h: 50 };
+  return { l: 0, t: 50, w: 50, h: 50 };
+}
+
 function superStateText(p) {
   return p.maskTime > 0 ? Math.ceil(p.maskTime) + 's' : p.superCd > 0 ? 'wait ' + Math.ceil(p.superCd) + 's' : SUPER_SHORT[p.superType];
 }
@@ -1674,6 +1689,49 @@ function animate() {
         }
       } else {
         el.style.display = 'none';
+      }
+    });
+    // levels 2 and 5: trapped players get teleported out (with a blackout flash)
+    if (level === 2 || level === 5) {
+      humans().forEach(function (p) {
+        if (!p.alive) return;
+        p.teleCd = Math.max(0, (p.teleCd || 0) - dt);
+        if (p.teleCd > 0) return;
+        var tt = tileOf(p);
+        var tdirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        var hasExit = tdirs.some(function (d) {
+          var row = grid[tt.z + d[1]];
+          return row && row[tt.x + d[0]] === 0;
+        });
+        if (hasExit) return;
+        // fully boxed in — beam them out
+        var opts = [];
+        for (var zz = 1; zz < ROWS - 1; zz++)
+          for (var xx = 1; xx < COLS - 1; xx++)
+            if (grid[zz][xx] === 0 && !bombAt(xx, zz) && !explosionAt(xx, zz)) opts.push([xx, zz]);
+        if (!opts.length) return;
+        var dest = opts[Math.floor(Math.random() * opts.length)];
+        var dc = tileCenter(dest[0], dest[1]);
+        p.x = dc.x; p.z = dc.z;
+        p.mesh.position.set(p.x, 0, p.z);
+        p.teleCd = 3;
+        p.teleFlash = 0.9;
+        snd(1200, 0.2, 'sine'); snd(600, 0.35, 'sine');
+      });
+    }
+    // teleport blackout flash
+    humans().forEach(function (p, hi) {
+      var tel = document.getElementById('tele' + hi);
+      if (!tel) return;
+      if (p.teleFlash > 0) {
+        p.teleFlash -= dt;
+        var tr = viewRect(p);
+        tel.style.left = tr.l + '%'; tel.style.top = tr.t + '%';
+        tel.style.width = tr.w + '%'; tel.style.height = tr.h + '%';
+        tel.style.display = 'flex';
+        if (p.teleFlash <= 0) { p.teleFlash = 0; tel.style.display = 'none'; }
+      } else {
+        tel.style.display = 'none';
       }
     });
     // superpower cooldowns tick back toward ready
