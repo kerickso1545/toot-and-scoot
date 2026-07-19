@@ -1040,7 +1040,8 @@ function explode(b) {
     scene.add(m);
     explosions.push({ gx: t[0], gz: t[1], timer: 0.45, mesh: m, owner: b.owner });
     for (var i = powerups.length - 1; i >= 0; i--) {
-      if (powerups[i].gx === t[0] && powerups[i].gz === t[1]) {
+      if (powerups[i].gx === t[0] && powerups[i].gz === t[1] && powerups[i].type !== 'beans') {
+        // blasts burn up regular power-ups — but the can of beans is indestructible
         scene.remove(powerups[i].mesh);
         powerups.splice(i, 1);
       }
