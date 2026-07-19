@@ -30,6 +30,12 @@
     display: flex; align-items: center; justify-content: center;
   }
   #scoreboard { margin: 10px 0 4px; font-size: 17px; color: #ffd54f; }
+  .blindfx {
+    position: fixed; display: none; z-index: 6; pointer-events: none;
+    background: rgba(45, 60, 15, 0.93); align-items: center; justify-content: center;
+    color: #c5e1a5; font-family: 'Arial Black', Arial, sans-serif; font-size: 40px;
+    text-shadow: 2px 2px 0 #000;
+  }
   .scorerow { font-family: 'Courier New', monospace; font-size: 17px; color: #fff; }
   #levelmsg {
     position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
@@ -106,7 +112,8 @@
   <p>Controller: left stick = move &nbsp;&middot;&nbsp; right stick = camera &nbsp;&middot;&nbsp; B or trigger = fart &nbsp;&middot;&nbsp; A = use power-up</p>
   <p>Pause menu: + button (or Esc on the keyboard)</p>
   <p>A fart lingers for a moment, then spreads FAST. Toot and scoot!</p>
-  <p>Power-ups: <b style="color:#ffab40">orange = more gas</b> &middot; <b style="color:#ff5252">red = bigger blast</b> &middot; <b style="color:#40c4ff">blue = Super Scoot</b> &middot; <b style="color:#66bb6a">green = trap wall</b> &middot; <b style="color:#eceff1">white = air spray</b></p>
+  <p>Power-ups: <b style="color:#ffab40">orange = more gas</b> &middot; <b style="color:#ff5252">red = bigger blast</b> &middot; <b style="color:#40c4ff">blue = Super Scoot</b> &middot; <b style="color:#66bb6a">green = trap wall</b> &middot; <b style="color:#eceff1">white = air spray</b> &middot; <b style="color:#ce93d8">purple = Turbo Toot</b></p>
+  <p>Turbo Toot: face a rival (or another player) and use it — a stink blast blinds them for 5 seconds!</p>
   <p>Air spray: makes any fart near you disappear before it spreads. Trap wall: blocks a tile for 10 seconds — fart + wall = trap!</p>
   <p>Superpower on X (or Q): a different one every level, one use each! <b>Gas Mask</b> = run through farts for 8 seconds. <b>Silent But Deadly</b> = drop an invisible, silent fart nobody senses coming. <b>Dutch Oven</b> = trap the nearest rival under a dome with a blast inside!</p>
   <p>You can only hold ONE power-up — press A (or E on the keyboard) to use it. Grab a second one before using the first and it's wasted!</p>
@@ -166,6 +173,9 @@
   <rect x="-20" y="-20" width="140" height="140" fill="#0c0c08" opacity="0.96" mask="url(#eyeholes)"/>
   <rect x="-20" y="-20" width="140" height="140" fill="#7a8f4a" opacity="0.07"/>
 </svg>
+<div id="blind0" class="blindfx">STINKED!</div>
+<div id="blind1" class="blindfx">STINKED!</div>
+<div id="blind2" class="blindfx">STINKED!</div>
 <div id="hudroot" style="display:none">
   <div class="hpanel" id="hudTL">
     <div class="hlabel">Level</div>
@@ -350,8 +360,8 @@ var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
-var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR SPRAY' };
-var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1' };
+var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR SPRAY', turbo: 'TURBO TOOT' };
+var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 
 function pickMode(n, el, ev) {
   if (ev) ev.stopPropagation();
@@ -843,6 +853,7 @@ function startLevel(keepStats) {
   }
   hudroot.style.display = 'block';
   maskoverlay.style.display = 'none';
+  for (var bl = 0; bl < 3; bl++) document.getElementById('blind' + bl).style.display = 'none';
 
   var spawns = levelSpawns.slice(numPlayers);
   var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
@@ -1046,7 +1057,8 @@ function spawnPowerup(x, z) {
     { t: 'range', color: 0xff5252 },
     { t: 'speed', color: 0x40c4ff },
     { t: 'wall',  color: 0x66bb6a },
-    { t: 'spray', color: 0xf5f5f5 }
+    { t: 'spray', color: 0xf5f5f5 },
+    { t: 'turbo', color: 0x9c27b0 }
   ];
   var pick = types[Math.floor(Math.random() * types.length)];
   var m = new THREE.Mesh(puGeo, new THREE.MeshLambertMaterial({ color: pick.color, emissive: pick.color, emissiveIntensity: 0.35 }));
@@ -1086,6 +1098,22 @@ function tryMoveBot(bot, dx, dz) {
 }
 function botThink(bot, dt) {
   if (bot.moving) return;
+  if (bot.blindTime > 0) {
+    // blinded: stumbles randomly, can't chase, fart, or sense danger
+    bot.timer -= dt;
+    if (bot.timer > 0) return;
+    bot.timer = 0.25 + Math.random() * 0.35;
+    var bdirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    var opts = [];
+    for (var bi = 0; bi < 4; bi++) {
+      if (passableBot(bot.gx + bdirs[bi][0], bot.gz + bdirs[bi][1], bot)) opts.push(bdirs[bi]);
+    }
+    if (opts.length) {
+      var pk = opts[Math.floor(Math.random() * opts.length)];
+      tryMoveBot(bot, pk[0], pk[1]);
+    }
+    return;
+  }
   var danger = dangerMap();
   var dirs = [[1,0],[-1,0],[0,1],[0,-1]];
   var here = bot.gx + ',' + bot.gz;
@@ -1264,6 +1292,58 @@ function useSuperFor(p) {
   }
 }
 
+function addBlindCloud(v) {
+  if (v.blindMesh) return;
+  var m = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0x6b8e23, transparent: true, opacity: 0.8 }));
+  m.position.y = 2.4;
+  v.mesh.add(m);
+  v.blindMesh = m;
+}
+function removeBlindCloud(v) {
+  if (v.blindMesh) { v.mesh.remove(v.blindMesh); v.blindMesh = null; }
+}
+function spawnStinkPuff(x, z) {
+  var c = tileCenter(x, z);
+  var m = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8),
+    new THREE.MeshLambertMaterial({ color: 0x8bc34a, transparent: true, opacity: 0.55, depthWrite: false }));
+  m.position.set(c.x, 1, c.z);
+  scene.add(m);
+  domes.push({ mesh: m, timer: 1.2 });
+}
+function turboToot(p) {
+  // a directed blast of stink: blinds whoever is in front of you for 5 seconds
+  var rot = p.mesh.rotation.y;
+  var sx = Math.sin(rot), cz = Math.cos(rot);
+  var dx = 0, dz = 0;
+  if (Math.abs(sx) > Math.abs(cz)) dx = sx > 0 ? 1 : -1;
+  else dz = cz > 0 ? 1 : -1;
+  var pt = tileOf(p);
+  for (var r = 1; r <= 4; r++) {
+    var x = pt.x + dx * r, z = pt.z + dz * r;
+    if (grid[z][x] === 1 || grid[z][x] === 3) break;   // walls block the stink
+    var victim = null;
+    bots.forEach(function (b) {
+      if (b.alive && ((b.gx === x && b.gz === z) || (b.moving && b.tx === x && b.tz === z))) victim = b;
+    });
+    if (!victim) humans().forEach(function (h) {
+      if (h !== p && h.alive) {
+        var t = tileOf(h);
+        if (t.x === x && t.z === z) victim = h;
+      }
+    });
+    if (victim) {
+      victim.blindTime = 5;
+      addBlindCloud(victim);
+      spawnStinkPuff(x, z);
+      fart(ownerProfile(p), true);
+      snd(950, 0.25, 'sawtooth');
+      return true;
+    }
+  }
+  return false;
+}
+
 function usePowerupFor(p) {
   if (!running || !p || !p.alive || !p.held) return;
   if (p.held === 'wall') {
@@ -1271,6 +1351,9 @@ function usePowerupFor(p) {
   }
   else if (p.held === 'spray') {
     if (!sprayAir(p)) { snd(110, 0.2, 'square'); return; }   // no fart nearby — save it for when you need it
+  }
+  else if (p.held === 'turbo') {
+    if (!turboToot(p)) { snd(110, 0.2, 'square'); return; }  // nobody in front of you — keep it
   }
   else if (p.held === 'bomb') p.maxBombs++;
   else if (p.held === 'range') p.range++;
@@ -1502,6 +1585,29 @@ function animate() {
       b.mesh.scale.set(s, s * 0.8, s);
       if (b.timer <= 0) explode(b);
     });
+    // blind timers: cover the stinked player's part of the screen
+    humans().forEach(function (p, hi) {
+      var el = document.getElementById('blind' + hi);
+      if (!el) return;
+      if (p.blindTime > 0) {
+        p.blindTime -= dt;
+        if (p.blindTime <= 0) {
+          p.blindTime = 0;
+          removeBlindCloud(p);
+          el.style.display = 'none';
+        } else {
+          var r;
+          if (!twoPlayer) r = { l: 0, t: 0, w: 100, h: 100 };
+          else if (numPlayers === 2) r = p === player ? { l: 0, t: 0, w: 50, h: 100 } : { l: 50, t: 0, w: 50, h: 100 };
+          else r = p === player ? { l: 0, t: 0, w: 50, h: 50 } : p === player2 ? { l: 50, t: 0, w: 50, h: 50 } : { l: 0, t: 50, w: 50, h: 50 };
+          el.style.left = r.l + '%'; el.style.top = r.t + '%';
+          el.style.width = r.w + '%'; el.style.height = r.h + '%';
+          el.style.display = 'flex';
+        }
+      } else {
+        el.style.display = 'none';
+      }
+    });
     // gas mask timers: gray while worn, blinks before wearing off
     humans().forEach(function (p) {
       if (p.maskTime <= 0) return;
@@ -1563,6 +1669,10 @@ function animate() {
     // bots
     bots.forEach(function (bot) {
       if (!bot.alive) return;
+      if (bot.blindTime > 0) {
+        bot.blindTime -= dt;
+        if (bot.blindTime <= 0) { bot.blindTime = 0; removeBlindCloud(bot); }
+      }
       botThink(bot, dt);
       if (bot.moving) {
         var c = tileCenter(bot.tx, bot.tz);
