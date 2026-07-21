@@ -1,5 +1,8 @@
 # Activity Log
 
+## 2026-07-21
+- 13:38 [Personal/otto] - Wrote PLAN-NEXT-LEVEL-3D.md: multi-agent work order for the visual "next level" upgrade (fart-cloud particle FX, modular animated characters, per-level themes, instancing + camera feel, serialized integration). Corrected external Gemini proposal's stale 2D premise; rejected GLTF/external assets as invariant violations. Awaiting Otto/Kevin approval on themes and character direction.
+
 ## 2026-07-19
 - 16:19 [Personal/otto] - Bug hunt and fix pass on toot-and-scoot.html: fixed 6 defects (gamepad resume dropping a bomb, pause-quit leaking mask/blind overlays and restarting via pending level-transition timer, bot spawn crash in 3P at high bot counts, P1 score resetting each level in multiplayer, Start button firing during initials/rules screens). Verified script syntax with node --check.
 
