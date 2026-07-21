@@ -23,7 +23,8 @@ document.body.appendChild(renderer.domElement);
 var sun = new THREE.DirectionalLight(0xffffff, 0.9);
 sun.position.set(20, 40, 15);
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xbbbbbb, 0.75));
+var ambient = new THREE.AmbientLight(0xbbbbbb, 0.75);
+scene.add(ambient);
 
 // ---------- materials ----------
 var matWall  = new THREE.MeshLambertMaterial({ color: 0x5c6bc0 });
@@ -109,6 +110,7 @@ function startLevel(keepStats) {
   bombs = []; explosions = []; powerups = []; bots = []; walls = []; domes = [];
   twoPlayer = numPlayers >= 2;
   setAspects();
+  applyTheme(themeForLevel(level));
   buildWorld();
 
   // difficulty tier: rises with the chosen difficulty AND the current level
