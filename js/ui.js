@@ -241,6 +241,7 @@ function renderMenu() {
   settingsEl.style.display = menuOpen && menuScreen === 'settings' ? 'block' : 'none';
   document.getElementById('sndbtn').textContent = 'Sound: ' + (soundOn ? 'On' : 'Off');
   document.getElementById('cambtn').textContent = 'Camera speed: ' + ['Slow', 'Normal', 'Fast'][camSpeedIdx];
+  document.getElementById('shakebtn').textContent = 'Screen shake: ' + (fxShakeEnabled ? 'On' : 'Off');
   document.getElementById('pausemsg').textContent = padDiscMsg || '';
   menuButtons().forEach(function (b, i) { b.className = 'mbtn' + (i === menuIndex ? ' sel' : ''); });
 }
@@ -281,6 +282,7 @@ function menuAction(act, fromPad) {
   }
   else if (act === 'sound') { soundOn = !soundOn; renderMenu(); }
   else if (act === 'camspeed') { camSpeedIdx = (camSpeedIdx + 1) % 3; renderMenu(); }
+  else if (act === 'shake') { fxShakeEnabled = !fxShakeEnabled; renderMenu(); }
 }
 var levelMsgTimer = null;
 function showLevelMsg(text) {

@@ -33,13 +33,11 @@ var matFloorA = new THREE.MeshLambertMaterial({ color: 0x9ccc65 });
 var matFloorB = new THREE.MeshLambertMaterial({ color: 0xaed581 });
 var matBomb  = new THREE.MeshLambertMaterial({ color: 0x7cb342, transparent: true, opacity: 0.85 });
 var matTempWall = new THREE.MeshLambertMaterial({ color: 0x66bb6a });
-var matBoom  = new THREE.MeshBasicMaterial({ color: 0xb2ff59, transparent: true, opacity: 0.8, depthWrite: false });
 var boxGeo   = new THREE.BoxGeometry(TS, TS, TS);
 var crateGeo = new THREE.BoxGeometry(TS * 0.94, TS * 0.94, TS * 0.94);
 var rollGeo  = new THREE.CylinderGeometry(TS * 0.47, TS * 0.47, TS * 0.94, 20);
 var crateGeoActive = crateGeo, crateMatActive = null;   // set by applyTheme
 var bombGeo  = new THREE.SphereGeometry(0.55, 16, 12);
-var boomGeo  = new THREE.BoxGeometry(TS * 0.96, TS * 0.9, TS * 0.96);
 var puGeo    = new THREE.BoxGeometry(0.6, 0.6, 0.6);
 applyTheme('bathroom');
 // ---------- world state ----------
@@ -268,6 +266,7 @@ function resetTransientUI() {
     b.blindTime = 0;
     removeBlindCloud(b);
   });
+  resetFX();
 }
 // ---------- helpers ----------
 function playerTile() { return { x: Math.floor(player.x / TS), z: Math.floor(player.z / TS) }; }
@@ -320,11 +319,9 @@ function explode(b) {
       }
     }
   });
+  fxExplosionAt(tiles, { boss: !!(b.owner && b.owner.boss) });
   tiles.forEach(function (t) {
-    var c = tileCenter(t[0], t[1]);
-    var m = new THREE.Mesh(boomGeo, matBoom);
-    m.position.set(c.x, TS * 0.45, c.z);
-    scene.add(m);
+    var m = fxGroundGlow(t[0], t[1], b.owner && b.owner.boss);
     explosions.push({ gx: t[0], gz: t[1], timer: 0.45, mesh: m, owner: b.owner });
     for (var i = powerups.length - 1; i >= 0; i--) {
       if (powerups[i].gx === t[0] && powerups[i].gz === t[1] &&
@@ -627,6 +624,7 @@ function dutchOven(p) {
   dm.position.set(c2.x, 0, c2.z);
   scene.add(dm);
   domes.push({ mesh: dm, timer: 4.5 });
+  spawnDutchSwirl(c2.x, c2.z, 4.5);
   return true;
 }
 
@@ -704,13 +702,12 @@ function updateBossSpecial(bot, dt) {
       // air freshener interplay all behave as usual); owner = boss, and the boss
       // hit code skips explosions he owns, so he can't hurt himself.
       var org = bot.warnOrigin || [bot.gx, bot.gz];
-      bossCrossTiles(org[0], org[1]).forEach(function (t) {
+      var btiles = bossCrossTiles(org[0], org[1]);
+      fxExplosionAt(btiles, { boss: true });
+      btiles.forEach(function (t) {
         var x = t[0], z = t[1];
         if (grid[z][x] === 2) removeCrate(x, z);
-        var c = tileCenter(x, z);
-        var m = new THREE.Mesh(boomGeo, matBoom);
-        m.position.set(c.x, TS * 0.45, c.z);
-        scene.add(m);
+        var m = fxGroundGlow(x, z, true);
         explosions.push({ gx: x, gz: z, timer: 0.5, mesh: m, owner: bot });
         var other = bombAt(x, z);
         if (other) explode(other);
@@ -1156,14 +1153,14 @@ function animate() {
     // each human: controller (and keyboard for P1) drives movement, camera, and buttons
     if (player.alive) {
       controlHuman(player, p1pad, true, dt);
-      placeCam(camera, player, dt);
+      placeCam(camera, player, dt); applyShake(camera, player, dt);
     } else if (twoPlayer) {
       spectate(player, p1pad, camera, dt);
     }
     if (twoPlayer && player2) {
       if (player2.alive) {
         controlHuman(player2, p2pad, false, dt);
-        placeCam(camera2, player2, dt);
+        placeCam(camera2, player2, dt); applyShake(camera2, player2, dt);
       } else {
         spectate(player2, p2pad, camera2, dt);
       }
@@ -1171,13 +1168,15 @@ function animate() {
     if (twoPlayer && player3) {
       if (player3.alive) {
         controlHuman(player3, p3pad, false, dt);
-        placeCam(camera3, player3, dt);
+        placeCam(camera3, player3, dt); applyShake(camera3, player3, dt);
       } else {
         spectate(player3, p3pad, camera3, dt);
       }
     }
     // targeting previews for held Trap Wall / Turbo Toot
     updatePreviews();
+    // fart-cloud particles, dutch-oven swirls, blind-cloud bobbing
+    updateFX(dt);
 
     // bombs
     bombs.slice().forEach(function (b) {
@@ -1222,6 +1221,8 @@ function animate() {
       if (p.trailTile && (bt.x !== p.trailTile.x || bt.z !== p.trailTile.z)) {
         if (!bombAt(p.trailTile.x, p.trailTile.z)) {
           placeBomb(p.trailTile.x, p.trailTile.z, 1, p, { fuse: 1.3, quiet: true });
+          var fc = tileCenter(p.trailTile.x, p.trailTile.z);
+          spawnMiniPuff(fc.x, fc.z);
         }
         p.trailTile = bt;
       }
@@ -1265,7 +1266,6 @@ function animate() {
     // explosions
     for (var i = explosions.length - 1; i >= 0; i--) {
       explosions[i].timer -= dt;
-      explosions[i].mesh.material = matBoom;
       if (explosions[i].timer <= 0) {
         scene.remove(explosions[i].mesh);
         explosions.splice(i, 1);
