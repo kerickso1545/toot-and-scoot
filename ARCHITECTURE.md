@@ -1,8 +1,28 @@
 # Toot and Scoot — Architecture
 
-Single self-contained HTML file (`toot-and-scoot.html`, ~2700 lines): CSS in
-`<style>`, UI in HTML, one big inline `<script>` (ES5 style). Three.js r128 from
-cdnjs is the only external dependency. No build step.
+Plain multi-file layout, no build step. `toot-and-scoot.html` is the shell
+(markup + ordered `<script src>` tags); `css/style.css` holds all CSS; the game
+JS (ES5 style) is split into classic scripts that share ONE global scope — NOT
+ES modules, no import/export. Three.js r128 from cdnjs is the only external
+dependency. Load order is `constants → theme → audio → meshes → world → fx →
+ui → main`; files before `main.js` contain only declarations (plus simple `var`
+initializers), and ALL load-time side effects (scene/renderer setup, event
+listener registration, `applyTheme('bathroom')`, `buildWorld()`, `animate()`
+kickoff) live at the bottom of `js/main.js`, loaded last. Function declarations
+hoist within a file but not across files — keep it that way.
+
+- `js/constants.js` — balance constants, `PU_NAME`/`PU_COLOR`, `FARTS`, `MAZES`
+- `js/theme.js` — `THEMES`, `canvasTex`, `applyTheme`
+- `js/audio.js` — `fart()`, `snd()`, `ownerProfile`, `actx`
+- `js/meshes.js` — `HATMAP`, `makeHat`, `makeBot`, `makePlayerMesh`
+- `js/world.js` — `buildWorld`, `insideShape`, `pillarAt`, `findSpawn`,
+  `tileCenter`, `tileOf`, `collides`, `overlappingSolids`, `removeCrate`
+- `js/fx.js` — aim-preview visuals (`updatePreviews`, `clearPreview`), blind
+  clouds, `spawnStinkPuff`
+- `js/ui.js` — title menu + navigation, rules, initials/leaderboard,
+  pause/settings menus, pad status, `showLevelMsg`/`showPMsg`, HUD html helpers
+- `js/main.js` — everything else: state globals, lifecycle, bombs/explosions,
+  bot AI, boss, abilities, input, cameras, `animate()` loop
 
 ## The 30-second mental model
 

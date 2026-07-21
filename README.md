@@ -60,9 +60,10 @@ also fully supported.
   (1P/2P), stamina bar, boss bar
 
 ### Tech notes
-- Single self-contained HTML file; Three.js r128 from CDN; Web Audio API for
-  all sound (synthesized fart voices per character); Gamepad API;
-  localStorage for the leaderboard
+- Plain HTML/CSS/JS files (no build step): `toot-and-scoot.html` shell +
+  `css/style.css` + eight `js/*.js` scripts loaded in order; Three.js r128
+  from CDN; Web Audio API for all sound (synthesized fart voices per
+  character); Gamepad API; localStorage for the leaderboard
 - Bathroom theme drawn procedurally in code (canvas textures) — porcelain
   tile, toilet-paper-roll crates, frosted-glass trap walls
 

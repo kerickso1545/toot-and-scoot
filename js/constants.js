@@ -1,0 +1,26 @@
+var COLS = 15, ROWS = 13, TS = 2;           // tile size in world units
+var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
+var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
+// ---- balance caps for passive upgrades (players AND rivals) ----
+var MAX_GAS = 4, MAX_BLAST = 5, MAX_SPEED = 7.0, SPEED_STEP = 0.5;
+// ---------- maze layouts: a different arena shape for every level ----------
+var MAZES = [
+  { name: 'Classic',    shape: 'rect',     pillars: 'grid', crate: 0.72 },
+  { name: 'Octagon',    shape: 'octagon',  pillars: 'dots', crate: 0.7 },
+  { name: 'Circle',     shape: 'oval',     pillars: 'ring', crate: 0.7 },
+  { name: 'Triangle',   shape: 'triangle', pillars: 'diag', crate: 0.75 },
+  { name: 'Diamond',    shape: 'diamond',  pillars: 'grid', crate: 0.65 },
+  { name: 'Open floor', shape: 'rect',     pillars: 'none', crate: 0.82 }
+];
+// every character has their own fart voice:
+// base = pitch, sputter = putt-putt speed, dur = length, tone = muffled vs bright
+var FARTS = {
+  player:            { base: 100, sputter: 18, dur: 0.55, tone: 420 },
+  'Sir Toots-a-Lot': { base: 68,  sputter: 8,  dur: 0.95, tone: 350 },   // long, low, regal
+  'Stinky Pete':     { base: 92,  sputter: 30, dur: 0.5,  tone: 300 },   // wet sputter
+  'Windy Wendy':     { base: 185, sputter: 12, dur: 0.65, tone: 900 },   // high and whistly
+  'Princess Poot':   { base: 240, sputter: 24, dur: 0.28, tone: 1100 },  // dainty little squeak
+  'Gassy Gus':       { base: 52,  sputter: 6,  dur: 1.1,  tone: 260 },   // deep rumble
+  'Captain Cheeks':  { base: 112, sputter: 42, dur: 0.6,  tone: 500 },   // machine-gun putt-putt
+  'The Big Stinker': { base: 38,  sputter: 5,  dur: 1.5,  tone: 190 }    // the boss: an earthquake
+};

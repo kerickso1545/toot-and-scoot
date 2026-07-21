@@ -6,7 +6,7 @@ voice; Kevin relays it. Expect playful, kid-driven feature requests.
 
 ## Read these before making changes
 
-- `ARCHITECTURE.md` — code map of the single-file game: state model, systems,
+- `ARCHITECTURE.md` — code map of the game: file layout, state model, systems,
   function inventory, where everything lives. **Do not spelunk the code for
   basics; read this first.**
 - `DESIGN-DECISIONS.md` — decision log with rationale. Do not re-litigate or
@@ -22,17 +22,29 @@ voice; Kevin relays it. Expect playful, kid-driven feature requests.
 
 | File | What |
 |---|---|
-| `toot-and-scoot.html` | THE game. Single self-contained file (~2700 lines). |
+| `toot-and-scoot.html` | THE game's shell: markup + ordered `<script src>` tags (load order matters — see ARCHITECTURE.md). |
+| `css/style.css` | All game CSS. |
+| `js/constants.js` | Balance constants, `PU_NAME`/`PU_COLOR`, `FARTS`, `MAZES`. |
+| `js/theme.js` | `THEMES`, `canvasTex`, `applyTheme`. |
+| `js/audio.js` | Web Audio synthesis: `fart()`, `snd()`, `ownerProfile`. |
+| `js/meshes.js` | `HATMAP`, `makeHat`, `makeBot`, `makePlayerMesh`. |
+| `js/world.js` | Maze gen + grid helpers: `buildWorld`, `insideShape`, `pillarAt`, `findSpawn`, `tileCenter`, `tileOf`, `collides`, `overlappingSolids`. |
+| `js/fx.js` | Separable visual helpers: aim previews (`updatePreviews`), blind clouds, stink puffs. |
+| `js/ui.js` | Title menu, rules, initials/leaderboard, pause/settings menus, pad status, HUD helpers. |
+| `js/main.js` | Everything else: state globals, lifecycle, bombs/bots/players, cameras, `animate()`, all load-time side effects (loaded LAST). |
 | `play.py` | Launcher: double-click → local web server on port 8765 + auto-opens the game (vite-style). Close the console window to stop. |
 | `boom-bots-arena.html` | Old 2D prototype. Frozen; don't maintain. |
 | `ottos-block-world.html` | Old 3D block-world demo. Frozen; don't maintain. |
 
 ## Workflow rules
 
-1. **Edit `toot-and-scoot.html` in place.** Never rewrite from scratch.
-2. **Syntax-check after edits** (game JS is one inline script; ES5 style, no
-   build step):
-   `python3 -c "import re; open('/tmp/g.js','w').write(re.findall(r'<script>(.*?)</script>', open('toot-and-scoot.html').read(), re.S)[-1])" && node --check /tmp/g.js`
+1. **Edit the existing files in place.** Never rewrite from scratch. The js
+   files are classic scripts sharing ONE global scope (NOT ES modules — no
+   import/export, no "use strict"). Function declarations hoist within a file
+   but not across files: any statement that EXECUTES at load time belongs in
+   `js/main.js` (loaded last), or must only depend on files loaded before it.
+2. **Syntax-check after edits** (ES5 style, no build step):
+   `node --check js/<changed-file>.js` for every changed js file.
 3. **Commit after each feature/fix** with a descriptive message
    (`git -c user.name="Kevin Erickson" -c user.email="kerickso1545@gmail.com" commit`).
    History is the changelog — keep commits granular.
@@ -51,9 +63,10 @@ voice; Kevin relays it. Expect playful, kid-driven feature requests.
   leaderboard origin never changes). No build tools, no bundlers, no
   frameworks — plain files served as-is, edit-and-refresh. Multi-file layout
   and local binary assets (e.g., embedded/fetched `.glb`) are now PERMITTED
-  since the game is served over HTTP, but don't split the file or add assets
-  without a reason; today the game is still one self-contained file that also
-  works from `file://`. Textures are painted in code onto canvas (`THEMES`),
+  since the game is served over HTTP, but don't add more files or assets
+  without a reason; today the game is plain `<script src>` files (no `fetch`ed
+  assets), so it still also works from `file://`. Textures are painted in code
+  onto canvas (`THEMES`),
   audio is Web Audio synthesis — keep procedural as the default, assets as
   the exception.
 - ES5-flavored JS (var, function declarations) to match the existing codebase.
