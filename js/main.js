@@ -937,6 +937,7 @@ function controlHuman(p, pd, kb, dt) {
   if (pd && ((pd.buttons[10] && pd.buttons[10].pressed) || (pd.buttons[6] && pd.buttons[6].pressed))) wantSprint = true;
   if (wantSprint && moving && p.exhausted) showPMsg(p, 'Too tired to sprint', 'sprint');   // throttled inside showPMsg
   var sprinting = wantSprint && moving && !p.exhausted;
+  p.sprinting = sprinting;   // read by placeCam for the sprint FOV kick
   if (sprinting) p.stamina = Math.max(0, p.stamina - 10 * dt);
   else p.stamina = Math.min(100, p.stamina + 20 * dt);
   if (p.stamina <= 0) p.exhausted = true;
@@ -954,6 +955,8 @@ function controlHuman(p, pd, kb, dt) {
   if (fwd || str) p.mesh.rotation.y = Math.atan2(vx, vz);
 }
 
+var FOV_BASE = 70, FOV_SPRINT_KICK = 5;   // sprint widens FOV by 5° (subtle; plan cap 6°)
+
 function camBlockedAt(x, y, z) {
   if (y >= TS) return false;                       // above wall height — always clear
   var gx = Math.floor(x / TS), gz = Math.floor(z / TS);
@@ -969,7 +972,7 @@ function camRayHit(p, dx, dy, dz, want) {
   }
   return want;
 }
-function placeCam(cam, p) {
+function placeCam(cam, p, dt) {
   var want = 6.5, comfy = 2.4, maxPitch = 1.35;
   // If a wall close behind would force an extreme zoom-in (character fills the
   // screen), ride the camera UP over the wall instead: find the smallest extra
@@ -992,8 +995,38 @@ function placeCam(cam, p) {
   if (target < p.camDist) p.camDist = target;                    // snap in when blocked
   else p.camDist += (target - p.camDist) * 0.12;                 // smooth the recovery back out
   var cd = p.camDist;
-  cam.position.set(p.x + dx * cd, 1.2 + dy * cd, p.z + dz * cd);
+  // position smoothing: lerp only the RESOLVED (already collision-marched)
+  // point, frame-rate independent (same half-life at any FPS).
+  var rpx = p.x + dx * cd, rpy = 1.2 + dy * cd, rpz = p.z + dz * cd;
+  if (!p.camPos) p.camPos = { x: rpx, y: rpy, z: rpz };
+  var sm = 1 - Math.pow(0.002, dt || 0.016);                     // ~0.11s half-life
+  p.camPos.x += (rpx - p.camPos.x) * sm;
+  p.camPos.y += (rpy - p.camPos.y) * sm;
+  p.camPos.z += (rpz - p.camPos.z) * sm;
+  // safety clamp: a lerped point can trail into a wall right after a snap-in,
+  // so re-march the actual head->smoothed ray and snap onto any hit. The
+  // camera can never sit inside a wall, not even for one frame.
+  var ox = p.camPos.x - p.x, oy = p.camPos.y - 1.25, oz = p.camPos.z - p.z;
+  var olen = Math.sqrt(ox * ox + oy * oy + oz * oz);
+  if (olen > 0.001) {
+    var hit = camRayHit(p, ox / olen, oy / olen, oz / olen, olen);
+    if (hit < olen) {
+      p.camPos.x = p.x + ox / olen * hit;
+      p.camPos.y = 1.25 + oy / olen * hit;
+      p.camPos.z = p.z + oz / olen * hit;
+    }
+  }
+  cam.position.set(p.camPos.x, p.camPos.y, p.camPos.z);
   cam.lookAt(p.x, 1.1, p.z);
+  // sprint FOV kick: +FOV_SPRINT_KICK° while sprinting, smoothed both ways.
+  // updateProjectionMatrix only when the fov really changed (>0.01) — free at rest.
+  if (p.fovCur === undefined) p.fovCur = FOV_BASE;
+  var fovTarget = FOV_BASE + (p.sprinting ? FOV_SPRINT_KICK : 0);
+  p.fovCur += (fovTarget - p.fovCur) * (1 - Math.pow(0.001, dt || 0.016));
+  if (Math.abs(cam.fov - p.fovCur) > 0.01) {
+    cam.fov = p.fovCur;
+    cam.updateProjectionMatrix();
+  }
 }
 
 function spectate(p, pd, cam, dt) {
@@ -1026,10 +1059,11 @@ function spectate(p, pd, cam, dt) {
   var t = targets[idx];
   p.specName = names[idx];
   var pos = t.x !== undefined ? { x: t.x, z: t.z } : { x: t.mesh.position.x, z: t.mesh.position.z };
-  var tmp = { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch, camDist: p.camDist, camLift: p.camLift };
-  placeCam(cam, tmp);
+  var tmp = { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch, camDist: p.camDist, camLift: p.camLift, fovCur: p.fovCur };
+  placeCam(cam, tmp, dt);
   p.camDist = tmp.camDist;
   p.camLift = tmp.camLift;
+  p.fovCur = tmp.fovCur;
 }
 
 function viewRect(p) {
@@ -1120,14 +1154,14 @@ function animate() {
     // each human: controller (and keyboard for P1) drives movement, camera, and buttons
     if (player.alive) {
       controlHuman(player, p1pad, true, dt);
-      placeCam(camera, player);
+      placeCam(camera, player, dt);
     } else if (twoPlayer) {
       spectate(player, p1pad, camera, dt);
     }
     if (twoPlayer && player2) {
       if (player2.alive) {
         controlHuman(player2, p2pad, false, dt);
-        placeCam(camera2, player2);
+        placeCam(camera2, player2, dt);
       } else {
         spectate(player2, p2pad, camera2, dt);
       }
@@ -1135,7 +1169,7 @@ function animate() {
     if (twoPlayer && player3) {
       if (player3.alive) {
         controlHuman(player3, p3pad, false, dt);
-        placeCam(camera3, player3);
+        placeCam(camera3, player3, dt);
       } else {
         spectate(player3, p3pad, camera3, dt);
       }

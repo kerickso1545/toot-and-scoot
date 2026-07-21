@@ -43,7 +43,13 @@ function findSpawn(tx, tz, used, minDist) {
   return best;
 }
 var worldMeshes = [];
+var floorTileGeo = null;   // shared floor-tile geometry, created once, reused every level
 function buildWorld() {
+  // free the previous level's instanced GPU buffers (instanceMatrix attribute).
+  // Only the InstancedMesh itself is disposed — the geometries (shared
+  // floorTileGeo / boxGeo) and the materials (shared matFloorA/matFloorB/
+  // matWall, mutated in place by applyTheme) must NOT be disposed.
+  worldMeshes.forEach(function (m) { if (m.isInstancedMesh) m.dispose(); });
   clearGroup(worldMeshes); worldMeshes = [];
   crateMeshes = {};
   currentMaze = (level % 10 === 0)
@@ -115,16 +121,41 @@ function buildWorld() {
     });
   });
 
+  // ---- render meshes ----
+  // Floor tiles and permanent walls (grid type 1) are static for the whole
+  // level, so they render as three THREE.InstancedMesh (checker floor A,
+  // checker floor B, walls): 3 draw calls instead of ~270+ individual meshes.
+  // CRITICAL: the instanced meshes hold the SAME shared material objects
+  // (matFloorA / matFloorB / matWall) that applyTheme() mutates in place —
+  // theme swaps re-skin the instanced world for free. Never clone or replace
+  // those materials here. Crates (type 2) stay individual meshes: they are
+  // removed one at a time (removeCrate) and use the per-theme
+  // crateGeoActive/crateMatActive. Trap walls (type 3) are placed at runtime
+  // by placeWall() in main.js and are not built here.
+  // (r128 InstancedMesh sets frustumCulled=false in its constructor, so the
+  // single-tile geometry bounds can never wrongly cull the whole arena.)
+  if (!floorTileGeo) floorTileGeo = new THREE.BoxGeometry(TS, 0.2, TS);
+  var floorACount = 0, floorBCount = 0, wallCount = 0;
+  for (var zc = 0; zc < ROWS; zc++) {
+    for (var xc = 0; xc < COLS; xc++) {
+      if ((xc + zc) % 2) floorACount++; else floorBCount++;
+      if (grid[zc][xc] === 1) wallCount++;
+    }
+  }
+  var instFloorA = new THREE.InstancedMesh(floorTileGeo, matFloorA, floorACount);
+  var instFloorB = new THREE.InstancedMesh(floorTileGeo, matFloorB, floorBCount);
+  var instWall = new THREE.InstancedMesh(boxGeo, matWall, wallCount);
+  var m4 = new THREE.Matrix4();
+  var ai = 0, bi = 0, wi = 0;
   for (var z2 = 0; z2 < ROWS; z2++) {
     for (var x2 = 0; x2 < COLS; x2++) {
       var c = tileCenter(x2, z2);
-      var f = new THREE.Mesh(new THREE.BoxGeometry(TS, 0.2, TS), (x2 + z2) % 2 ? matFloorA : matFloorB);
-      f.position.set(c.x, -0.1, c.z);
-      scene.add(f); worldMeshes.push(f);
+      m4.makeTranslation(c.x, -0.1, c.z);
+      if ((x2 + z2) % 2) instFloorA.setMatrixAt(ai++, m4);
+      else instFloorB.setMatrixAt(bi++, m4);
       if (grid[z2][x2] === 1) {
-        var w = new THREE.Mesh(boxGeo, matWall);
-        w.position.set(c.x, TS / 2, c.z);
-        scene.add(w); worldMeshes.push(w);
+        m4.makeTranslation(c.x, TS / 2, c.z);
+        instWall.setMatrixAt(wi++, m4);
       } else if (grid[z2][x2] === 2) {
         var cr = new THREE.Mesh(crateGeoActive, crateMatActive);
         cr.position.set(c.x, TS * 0.47, c.z);
@@ -133,6 +164,12 @@ function buildWorld() {
       }
     }
   }
+  instFloorA.instanceMatrix.needsUpdate = true;
+  instFloorB.instanceMatrix.needsUpdate = true;
+  instWall.instanceMatrix.needsUpdate = true;
+  scene.add(instFloorA); worldMeshes.push(instFloorA);
+  scene.add(instFloorB); worldMeshes.push(instFloorB);
+  scene.add(instWall); worldMeshes.push(instWall);
 }
 
 function removeCrate(x, z) {
