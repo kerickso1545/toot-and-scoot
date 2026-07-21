@@ -282,6 +282,7 @@ function dropBombFor(p) {
   var t = tileOf(p);
   if (own >= p.maxBombs || bombAt(t.x, t.z)) return;
   placeBomb(t.x, t.z, p.range, p);
+  charSquash(p);
 }
 function placeBomb(gx, gz, range, owner, opts) {
   var c = tileCenter(gx, gz);
@@ -456,6 +457,7 @@ function botThink(bot, dt) {
   var own = bombs.filter(function (b) { return b.owner === bot; }).length;
   if ((nearCrate || nearPlayer) && own < bot.maxBombs && Math.random() < levelParams.bombChance) {
     placeBomb(bot.gx, bot.gz, bot.range, bot);
+    charSquash(bot);
     return;
   }
 
@@ -1385,7 +1387,8 @@ function animate() {
           }
         } else {
           bot.alive = false;
-          scene.remove(bot.mesh);
+          charSpin(bot);   // knockout spin-out; removal delayed past the 0.6s animation
+          (function (deadBot) { later(function () { scene.remove(deadBot.mesh); }, 650); })(bot);
           snd(120, 0.5, 'triangle');
           if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;   // 100 points per rival YOU gassed
         }
@@ -1410,7 +1413,15 @@ function animate() {
           return;
         }
         p.alive = false;
-        scene.remove(p.mesh);
+        if (twoPlayer) {
+          // multiplayer only: knockout spin-out, removal delayed past the animation.
+          // In 1P, death calls endGame (running=false + bumpSession) so no spin
+          // would play — keep the instant removal there (WS-B handoff safety note).
+          charSpin(p);
+          (function (deadP) { later(function () { scene.remove(deadP.mesh); }, 650); })(p);
+        } else {
+          scene.remove(p.mesh);
+        }
         // 200 points for gassing another player
         if (hitBy.owner && hitBy.owner !== p && hitBy.owner.score !== undefined) hitBy.owner.score += 200;
         if (!twoPlayer) {
@@ -1561,6 +1572,8 @@ function animate() {
     }
     }
   }
+
+  updateCharacterAnim(dt);
 
   if (twoPlayer && player3 && running) {
     // 3 players: four quadrants — P1, P2, P3, and a bird's-eye view of the arena

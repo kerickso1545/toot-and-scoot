@@ -73,23 +73,150 @@ function makeHat(type, group) {
   }
 }
 
-function makeBot(gx, gz, color, name) {
+// ---------- Characters 2.0: modular low-poly bodies ----------
+// buildCharacter(color, opts) -> THREE.Group with origin at GROUND level.
+// Same envelope as the old cylinder+sphere body (footprint radius ~0.5-0.6,
+// head center y=1.35, hat base y=1.72) so cameras, collision framing, blind
+// clouds (added to the group at y=2.4) and boss scaling all behave identically.
+//
+// Hierarchy (group transform is OWNED by main.js — position, rotation.y facing,
+// and scale (boss 2.2x pulse) are never touched by the animation code):
+//   group
+//     rig            <- squash-and-stretch scale + knockout spin ONLY
+//       footL, footR <- waddle steps (position only)
+//       torsoNode    <- bob / waddle roll / lean (position.y, rotation, breath scale)
+//         torso, armL/armR (mitt swing pivots), backAnchor
+//         headNode   <- head, eyes, pupils, brows, blush, faceAnchor
+//           hatAnchor (named, at top of head, world y=1.72)
+//             hatMount (y=-1.72: cancels makeHat's built-in y~1.72 offset so
+//                       UNCHANGED makeHat output lands exactly on the head)
+//
+// Anchors retrievable via group.getObjectByName('hatAnchor' | 'faceAnchor' |
+// 'backAnchor') for future accessories (sunglasses, backpacks...).
+//
+// Material contract: ONE shared Lambert material colors torso+head+arms+feet.
+//   group.userData.mat = that material  (main.js shimmer/mask/reset pattern:
+//                        p.mesh.userData.mat.color.setHex/setHSL — unchanged)
+//   group.bodyMats     = [that material] (array for future multi-mat tinting)
+// Face features (eyes/pupils/brows/blush) are Basic materials, untinted —
+// same as the old eyes. enrageBoss() traverses and clones per-mesh, so the
+// boss red tint works on this hierarchy with no changes.
+function buildCharacter(color, opts) {
+  opts = opts || {};
   var group = new THREE.Group();
-  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.1, 12), new THREE.MeshLambertMaterial({ color: color }));
-  body.position.y = 0.55;
-  group.add(body);
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), new THREE.MeshLambertMaterial({ color: color }));
-  head.position.y = 1.35;
-  group.add(head);
-  var eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  var pupMat = new THREE.MeshBasicMaterial({ color: 0x263238 });
-  [-0.16, 0.16].forEach(function (ex) {
-    var e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), eyeMat);
-    e.position.set(ex, 1.42, 0.36); group.add(e);
-    var p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), pupMat);
-    p.position.set(ex, 1.42, 0.44); group.add(p);
-  });
-  makeHat(HATMAP[name], group);
+  var bodyMat = new THREE.MeshLambertMaterial({ color: color || 0x2979ff });
+  var darkMat = new THREE.MeshBasicMaterial({ color: 0x263238 });
+  var whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  var blushMat = new THREE.MeshBasicMaterial({ color: 0xff8a80 });
+
+  var rig = new THREE.Group();
+  rig.name = 'rig';
+  group.add(rig);
+
+  // stubby feet (flattened spheres), pivots at ground so steps slide/lift
+  function makeFoot(sx) {
+    var node = new THREE.Group();
+    node.name = sx < 0 ? 'footL' : 'footR';
+    node.position.set(sx * 0.2, 0.09, 0.06);
+    var m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), bodyMat);
+    m.scale.set(1, 0.55, 1.25);
+    node.add(m);
+    rig.add(node);
+    return node;
+  }
+  var footL = makeFoot(-1), footR = makeFoot(1);
+
+  var torsoNode = new THREE.Group();
+  torsoNode.name = 'torsoNode';
+  rig.add(torsoNode);
+
+  // chunky egg torso (rounder + friendlier than the old cylinder)
+  var torso = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 12), bodyMat);
+  torso.scale.set(1, 1.1, 0.9);
+  torso.position.y = 0.62;
+  torsoNode.add(torso);
+
+  // mitt arms, pivoted at the shoulders so they can swing
+  function makeArm(sx) {
+    var node = new THREE.Group();
+    node.name = sx < 0 ? 'armL' : 'armR';
+    node.position.set(sx * 0.44, 0.92, 0);
+    var m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), bodyMat);
+    m.position.set(sx * 0.07, -0.26, 0);
+    node.add(m);
+    torsoNode.add(node);
+    return node;
+  }
+  var armL = makeArm(-1), armR = makeArm(1);
+
+  // big head (same center/radius as before so every hat still fits)
+  var headNode = new THREE.Group();
+  headNode.name = 'headNode';
+  headNode.position.y = 1.35;
+  torsoNode.add(headNode);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), bodyMat);
+  headNode.add(head);
+
+  // expressive face: big eyes + pupils + cheerful brows + blush cheeks
+  function makeEyePair(sx) {
+    var refs = {};
+    refs.eye = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), whiteMat);
+    refs.eye.position.set(sx * 0.16, 0.07, 0.37);
+    headNode.add(refs.eye);
+    refs.pup = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), darkMat);
+    refs.pup.position.set(sx * 0.16, 0.08, 0.45);
+    headNode.add(refs.pup);
+    var brow = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.035, 0.04), darkMat);
+    brow.position.set(sx * 0.16, 0.26, 0.36);
+    brow.rotation.z = -sx * 0.12;
+    headNode.add(brow);
+    var blush = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), blushMat);
+    blush.scale.set(1, 0.7, 0.4);
+    blush.position.set(sx * 0.3, -0.06, 0.31);
+    headNode.add(blush);
+    return refs;
+  }
+  var eyeL = makeEyePair(-1), eyeR = makeEyePair(1);
+
+  // named anchors
+  var hatAnchor = new THREE.Group();
+  hatAnchor.name = 'hatAnchor';
+  hatAnchor.position.set(0, 0.37, 0);          // top of head (world y = 1.72)
+  headNode.add(hatAnchor);
+  var hatMount = new THREE.Group();
+  hatMount.name = 'hatMount';
+  hatMount.position.y = -1.72;                 // compensates makeHat's y offset
+  hatAnchor.add(hatMount);
+  var faceAnchor = new THREE.Group();
+  faceAnchor.name = 'faceAnchor';
+  faceAnchor.position.set(0, 0.02, 0.42);      // nose tip (world y ~= 1.37)
+  headNode.add(faceAnchor);
+  var backAnchor = new THREE.Group();
+  backAnchor.name = 'backAnchor';
+  backAnchor.position.set(0, 0.85, -0.48);     // small of the back
+  torsoNode.add(backAnchor);
+
+  group.userData.mat = bodyMat;
+  group.bodyMats = [bodyMat];
+  group.userData.rigRefs = {
+    rig: rig, torsoNode: torsoNode, headNode: headNode,
+    footL: footL, footR: footR, armL: armL, armR: armR,
+    eyeL: eyeL.eye, eyeR: eyeR.eye, pupL: eyeL.pup, pupR: eyeR.pup,
+    hatMount: hatMount, footY: 0.09, footZ: 0.06
+  };
+  group.userData.anim = {
+    phase: Math.random() * Math.PI * 2,   // desync so characters don't march in step
+    move: 0, lean: 0, glance: 0,
+    lastX: null, lastZ: null, lastYaw: null,
+    squashT: 0, spinT: 0,
+    blinkT: 1.5 + Math.random() * 3
+  };
+  return group;
+}
+
+function makeBot(gx, gz, color, name) {
+  var group = buildCharacter(color);
+  makeHat(HATMAP[name], group.userData.rigRefs.hatMount);
   var c = tileCenter(gx, gz);
   group.position.set(c.x, 0, c.z);
   scene.add(group);
@@ -98,22 +225,129 @@ function makeBot(gx, gz, color, name) {
 }
 
 function makePlayerMesh(color, hat) {
-  var group = new THREE.Group();
-  var blue = new THREE.MeshLambertMaterial({ color: color || 0x2979ff });
-  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.1, 12), blue);
-  body.position.y = 0.55; group.add(body);
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), blue);
-  head.position.y = 1.35; group.add(head);
-  var eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  var pupMat = new THREE.MeshBasicMaterial({ color: 0x263238 });
-  [-0.16, 0.16].forEach(function (ex) {
-    var e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), eyeMat);
-    e.position.set(ex, 1.42, 0.36); group.add(e);
-    var p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), pupMat);
-    p.position.set(ex, 1.42, 0.44); group.add(p);
-  });
-  makeHat(hat || playerHat, group);
-  group.userData.mat = blue;
+  var group = buildCharacter(color || 0x2979ff);
+  makeHat(hat || playerHat, group.userData.rigRefs.hatMount);
   scene.add(group);
   return group;
+}
+
+// ---------- character animation (transform-only, zero gameplay effect) ----------
+// charSquash(entity): 0.15s squash-and-stretch — call when a character farts
+// (dropBombFor for humans, the botThink placeBomb path for bots; NOT the
+// S.B.D. hidden bomb, which must stay silent AND invisible).
+function charSquash(entity) {
+  var g = entity && (entity.mesh || entity);
+  if (g && g.userData && g.userData.anim) g.userData.anim.squashT = 0.15;
+}
+// charSpin(entity): optional 0.6s knockout spin-out. Only useful if the caller
+// delays scene.remove(mesh) by ~650ms via later() — see HANDOFF-ws-characters.md.
+function charSpin(entity) {
+  var g = entity && (entity.mesh || entity);
+  if (g && g.userData && g.userData.anim) g.userData.anim.spinT = 0.6;
+}
+// updateCharacterAnim(dt): call once per frame from animate(). Reads existing
+// globals (running, humans(), bots) defensively; animates ONLY child nodes of
+// each character's rig — never the group's position/rotation.y/scale, which
+// main.js owns (movement, facing, boss 2.2x pulse).
+function updateCharacterAnim(dt) {
+  if (typeof running === 'undefined' || !running) return;
+  if (!dt || dt <= 0) return;
+  if (dt > 0.1) dt = 0.1;
+  if (typeof humans === 'function') {
+    humans().forEach(function (p) { animateCharacter(p, dt); });
+  }
+  if (typeof bots !== 'undefined' && bots && bots.forEach) {
+    bots.forEach(function (b) { animateCharacter(b, dt); });
+  }
+}
+function animateCharacter(ent, dt) {
+  if (!ent || !ent.mesh) return;
+  var g = ent.mesh;
+  var ud = g.userData;
+  if (!ud || !ud.anim || !ud.rigRefs) return;      // not a buildCharacter group
+  var a = ud.anim, r = ud.rigRefs;
+  if (!ent.alive && a.spinT <= 0) return;          // dead and not spin-outing
+  if (!g.parent) return;                           // already removed from scene
+
+  // actual movement speed from world position (humans sync mesh from x/z,
+  // bots move the mesh directly — both covered, no gameplay fields touched)
+  var spd = 0;
+  if (a.lastX !== null) {
+    spd = Math.sqrt((g.position.x - a.lastX) * (g.position.x - a.lastX) +
+                    (g.position.z - a.lastZ) * (g.position.z - a.lastZ)) / dt;
+  }
+  a.lastX = g.position.x;
+  a.lastZ = g.position.z;
+  var moveTarget = Math.min(spd / 3.2, 1.25);
+  a.move += (moveTarget - a.move) * Math.min(1, dt * 12);
+  var mv = a.move;
+
+  // turn rate (wrap-aware) -> sideways lean into turns
+  var yaw = g.rotation.y, dy = 0;
+  if (a.lastYaw !== null) {
+    dy = yaw - a.lastYaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+  }
+  a.lastYaw = yaw;
+  var leanTarget = mv > 0.05 ? Math.max(-0.3, Math.min(0.3, (dy / dt) * 0.06)) : 0;
+  a.lean += (leanTarget - a.lean) * Math.min(1, dt * 10);
+
+  // waddle phase advances with real speed
+  if (mv > 0.03) a.phase += dt * (5 + 9 * mv);
+  var s = Math.sin(a.phase), cs = Math.cos(a.phase);
+
+  // feet alternate: slide fore/aft and lift
+  r.footL.position.z = r.footZ + s * 0.16 * mv;
+  r.footR.position.z = r.footZ - s * 0.16 * mv;
+  r.footL.position.y = r.footY + Math.max(0, s) * 0.09 * mv;
+  r.footR.position.y = r.footY + Math.max(0, -s) * 0.09 * mv;
+
+  // mitt arms swing opposite the feet
+  r.armL.rotation.x = -s * 0.7 * mv;
+  r.armR.rotation.x = s * 0.7 * mv;
+
+  // torso: bob, waddle roll, forward lean while running, idle breathing
+  var breath = Math.sin(performance.now() / 450 + a.phase) * 0.02 * (1 - Math.min(mv, 1));
+  r.torsoNode.position.y = Math.abs(cs) * 0.06 * mv;
+  r.torsoNode.rotation.z = s * 0.1 * mv + a.lean;
+  r.torsoNode.rotation.x = 0.1 * Math.min(mv, 1);
+  r.torsoNode.scale.set(1 - breath * 0.5, 1 + breath, 1 - breath * 0.5);
+
+  // head stays a bit more level than the torso; pupils glance into the turn
+  r.headNode.rotation.z = -(s * 0.1 * mv + a.lean) * 0.5;
+  var glanceTarget = Math.max(-0.05, Math.min(0.05, -a.lean * 0.3));
+  a.glance += (glanceTarget - a.glance) * Math.min(1, dt * 8);
+  r.pupL.position.x = -0.16 + a.glance;
+  r.pupR.position.x = 0.16 + a.glance;
+
+  // occasional blink
+  a.blinkT -= dt;
+  var blink = a.blinkT > 0 && a.blinkT < 0.1;
+  if (a.blinkT <= 0) a.blinkT = 1.5 + Math.random() * 3.5;
+  r.eyeL.scale.y = blink ? 0.12 : 1;
+  r.eyeR.scale.y = blink ? 0.12 : 1;
+  r.pupL.visible = !blink;
+  r.pupR.visible = !blink;
+
+  // fart squash-and-stretch: rig scales about the GROUND origin, so the
+  // character scrunches downward; composes cleanly under the boss's
+  // main.js-owned group.scale (relative child transform, no anchor drift)
+  var sq = 0;
+  if (a.squashT > 0) {
+    a.squashT -= dt;
+    if (a.squashT < 0) a.squashT = 0;
+    sq = Math.sin((a.squashT / 0.15) * Math.PI);
+  }
+  r.rig.scale.set(1 + sq * 0.22, 1 - sq * 0.3, 1 + sq * 0.22);
+
+  // optional knockout spin-out: two quick turns + a little hop, then reset
+  if (a.spinT > 0) {
+    a.spinT -= dt;
+    if (a.spinT < 0) a.spinT = 0;
+    var k = 1 - a.spinT / 0.6;
+    r.rig.rotation.y = k * Math.PI * 4;
+    r.rig.position.y = Math.sin(k * Math.PI) * 0.6;
+    if (a.spinT === 0) { r.rig.rotation.y = 0; r.rig.position.y = 0; }
+  }
 }
