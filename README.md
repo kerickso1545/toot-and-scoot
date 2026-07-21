@@ -38,7 +38,10 @@ also fully supported.
 
 ### Core mechanics
 - Farts linger, then spread fast in four directions; blasts punch through
-  crates but stop at walls
+  crates but stop at walls — and now erupt as **billowing green gas clouds**
+  that swell, drift, and fade (boss blasts get their own menacing tint),
+  with a little screen shake when one goes off near you (toggle it off in
+  Settings: "Screen shake")
 - **Power-ups** (hold one, A to use): Extra Gas, Big Blast, Trap Wall,
   Air Freshener, Turbo Toot (blinds a victim for 5 s — pitch black screen for
   human victims)
@@ -52,6 +55,14 @@ also fully supported.
 - **Six maze shapes** cycle per level (Classic, Octagon, Circle, Triangle,
   Diamond, Open floor) with varied pillar patterns; generation guarantees
   full connectivity (no sealed pockets)
+- **Per-level themes** rotate as you climb: Bathroom (level 1) → Sewer
+  Kingdom (mossy stone + glowing slime) → Construction Site (caution stripes
+  + porta-potty crates) → Royal Throne Room (marble, gold, red carpet) →
+  repeat — and every 10th level the boss fight happens in a dark, red-lit
+  haunted-bathroom Boss Arena
+- **Animated characters**: everyone waddles as they run, leans into turns,
+  blinks, breathes when idle, scrunches down for a fart, and spins out when
+  gassed (in multiplayer) — hats and colors as always
 - **Boss every 10th level**: The Big Stinker — 1000 HP, 100 damage per blast,
   health bar, boss arena
 - **Six rivals** with signature hats and synthesized fart voices; smarter,
@@ -66,8 +77,12 @@ also fully supported.
   `css/style.css` + eight `js/*.js` scripts loaded in order; Three.js r128
   from CDN; Web Audio API for all sound (synthesized fart voices per
   character); Gamepad API; localStorage for the leaderboard
-- Bathroom theme drawn procedurally in code (canvas textures) — porcelain
-  tile, toilet-paper-roll crates, frosted-glass trap walls
+- All five themes drawn procedurally in code (canvas textures) — porcelain
+  tile, mossy sewer brick, caution stripes, marble and gold, and themed
+  crates (TP rolls, goo barrels, porta-potties); trap walls stay frosted and
+  readable in every theme
+- Fart clouds are a pooled particle system; floors and walls render as
+  instanced meshes so 3-player split screen stays fast
 
 ## Older prototypes
 

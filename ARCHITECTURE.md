@@ -12,13 +12,19 @@ kickoff) live at the bottom of `js/main.js`, loaded last. Function declarations
 hoist within a file but not across files — keep it that way.
 
 - `js/constants.js` — balance constants, `PU_NAME`/`PU_COLOR`, `FARTS`, `MAZES`
-- `js/theme.js` — `THEMES`, `canvasTex`, `applyTheme`
+- `js/theme.js` — `THEMES` (5 packs), `canvasTex`, `applyTheme`,
+  `themeForLevel` + `THEME_ROTATION`/`BOSS_THEME`
 - `js/audio.js` — `fart()`, `snd()`, `ownerProfile`, `actx`
-- `js/meshes.js` — `HATMAP`, `makeHat`, `makeBot`, `makePlayerMesh`
-- `js/world.js` — `buildWorld`, `insideShape`, `pillarAt`, `findSpawn`,
-  `tileCenter`, `tileOf`, `collides`, `overlappingSolids`, `removeCrate`
-- `js/fx.js` — aim-preview visuals (`updatePreviews`, `clearPreview`), blind
-  clouds, `spawnStinkPuff`
+- `js/meshes.js` — `HATMAP`, `makeHat`, `buildCharacter` (rig + anchors),
+  `makeBot`, `makePlayerMesh`, `updateCharacterAnim`, `charSquash`, `charSpin`
+- `js/world.js` — `buildWorld` (instanced floor/walls), `insideShape`,
+  `pillarAt`, `findSpawn`, `tileCenter`, `tileOf`, `collides`,
+  `overlappingSolids`, `removeCrate`
+- `js/fx.js` — fart-cloud particle pool (`fxExplosionAt`, `fxGroundGlow`,
+  `spawnFartCloud`, `spawnDutchSwirl`, `spawnMiniPuff`, `updateFX`,
+  `resetFX`), camera shake (`addShake`/`applyShake`, `fxShakeEnabled`),
+  aim-preview visuals (`updatePreviews`, `clearPreview`), blind clouds,
+  `spawnStinkPuff`
 - `js/ui.js` — title menu + navigation, rules, initials/leaderboard,
   pause/settings menus, pad status, `showLevelMsg`/`showPMsg`, HUD html helpers
 - `js/main.js` — everything else: state globals, lifecycle, bombs/explosions,
@@ -78,9 +84,40 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
 - **Maze**: `MAZES` (6 shapes cycling by level; boss arena every 10th),
   `insideShape`, `pillarAt`, `buildWorld()` (gen + flood-fill connectivity
   guarantee — isolated pockets get sealed; spawn generation with progressive
-  distance relaxation), `findSpawn`.
-- **Theme**: `THEMES.bathroom` + `applyTheme()` — canvas-painted textures
-  (porcelain walls, TP-roll cylinder crates via `crateGeoActive`).
+  distance relaxation), `findSpawn`. Floor tiles + permanent walls render as
+  3 `InstancedMesh` (render-only — `grid[z][x]` stays the collision/AI truth;
+  ~277-300 static draw calls → 3 per view). Crates and trap walls stay
+  individual meshes.
+- **Theme**: `THEMES` (bathroom, sewer, construction, royal, bossArena) +
+  `applyTheme()` — canvas-painted textures (crate shape/material via
+  `crateGeoActive`/`crateMatActive`). `themeForLevel(level)` rotates themes
+  per level (L1 bathroom, every 10th bossArena; rotation in `THEME_ROTATION`).
+  `startLevel` calls `applyTheme(themeForLevel(level))` BEFORE `buildWorld()`.
+  CONTRACT: `applyTheme` MUTATES the shared materials (`matWall`,
+  `matFloorA/B`, `matTempWall`, `matCrate`) in place — never replaces them —
+  so the instanced world meshes re-theme for free. Old canvas textures are
+  disposed on swap. Optional per-theme keys (light/ambient/fog) default to
+  bathroom values; ambient tinting uses the `ambient` global in main.js.
+- **FX pool + shake** (`js/fx.js`): explosions are pooled additive gas-puff
+  sprites (~150 cap, 3-phase burst/billow/linger) + pooled ground-glow planes
+  that serve as the `explosions[]` entry meshes — lethality is still 100%
+  `explosions[].timer` on exact tiles; clouds are cosmetic. `updateFX(dt)`
+  runs inside the running-check in `animate()` (pause freezes clouds with
+  lethality); `resetFX()` is the last call in `resetTransientUI()`.
+  Proximity camera shake per human (`applyShake` after each `placeCam`;
+  spectators never shake), gated by the Settings "Screen shake" toggle
+  (`fxShakeEnabled`, session-only like `soundOn`).
+- **Characters**: `buildCharacter(color)` builds a modular low-poly rig
+  (torso/head/feet/arms/eyes) with named anchors (`hatAnchor`, `faceAnchor`,
+  `backAnchor`); hats mount unchanged via an inner `hatMount`. One shared
+  body material at `group.userData.mat` (+ `group.bodyMats`) keeps the
+  shimmer/mask/enrage mutations working. `updateCharacterAnim(dt)` (end of
+  `animate()`, after movement) drives waddle/lean/blink/idle-breathing from
+  actual world-position speed; `charSquash` on fart (never on S.B.D.),
+  `charSpin` on knockout (bots always; humans only in multiplayer — removal
+  delayed 650ms via `later()`). Animation is transform-only on rig children;
+  the group's position/rotation.y/scale stay main.js-owned (boss 2.2× scale
+  composes safely).
 - **Bombs/blasts**: `dropBombFor`, `placeBomb(gx,gz,range,owner,opts)`
   (opts: `fuse`, `hidden` (S.B.D.), `quiet` (bean trail)), `explode` (cross
   blast, punches through crates, stops at walls 1/3, chains, drops power-ups,
@@ -108,10 +145,16 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   Shift/L3/LT ×1.6 drains stamina; beans/revive ×2; suppress-until-release
   after resume), `collides`/`overlappingSolids` (can always walk OUT of a
   solid you overlap — trap-wall unstick).
-- **Cameras**: `placeCam` per human with grid-march collision (`camBlockedAt`,
-  smooth `camDist` recovery); `spectate` for knocked-out players (A cycles);
+- **Cameras**: `placeCam(cam, p, dt)` per human with grid-march collision
+  (`camBlockedAt`, smooth `camDist` recovery, `camLift` ride-over-walls);
+  the RESOLVED point is then position-smoothed (`p.camPos`, ~0.11s half-life)
+  with a re-marched safety clamp so the eye can never sit inside a wall;
+  sprint FOV kick +5° (`FOV_BASE`/`FOV_SPRINT_KICK`, reads `p.sprinting` set
+  in `controlHuman`; `updateProjectionMatrix` only on real change). `aimDir`
+  still reads raw yaw — aiming is unsmoothed. `spectate` for knocked-out
+  players (A cycles; carries `fovCur` but never `sprinting`/`camPos`);
   split-screen scissor render at the end of `animate()` (2P halves; 3P
-  quadrants + `cameraTop` bird's-eye).
+  quadrants + `cameraTop` bird's-eye, both untouched by smoothing).
 - **Controllers**: title readiness (`connectedPads`, `requiredPads`,
   `updatePadStatus`); per-match lock `assignPads()` by gamepad index;
   disconnect → auto-pause with named message, `reclaimPads()` on reconnect.
