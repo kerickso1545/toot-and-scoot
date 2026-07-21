@@ -959,20 +959,33 @@ function camBlockedAt(x, y, z) {
   var g = grid[gz][gx];
   return g === 1 || g === 2 || g === 3;            // walls, crates, trap walls (never the floor)
 }
-function placeCam(cam, p) {
-  var want = 6.5;
-  var dx = Math.sin(p.yaw) * Math.cos(p.pitch);
-  var dz = Math.cos(p.yaw) * Math.cos(p.pitch);
-  var dy = Math.sin(p.pitch);
+function camRayHit(p, dx, dy, dz, want) {
   // cheap grid march from the head toward the desired camera spot: sample every
-  // ~0.3 units; if a solid tile is in the way, pull the camera in just before it
-  var target = want;
+  // ~0.3 units; if a solid tile is in the way, stop just before it
   for (var d = 0.3; d <= want; d += 0.3) {
-    if (camBlockedAt(p.x + dx * d, 1.25 + dy * d, p.z + dz * d)) {
-      target = Math.max(0.7, d - 0.3);
-      break;
-    }
+    if (camBlockedAt(p.x + dx * d, 1.25 + dy * d, p.z + dz * d)) return Math.max(0.7, d - 0.3);
   }
+  return want;
+}
+function placeCam(cam, p) {
+  var want = 6.5, comfy = 2.4, maxPitch = 1.35;
+  // If a wall close behind would force an extreme zoom-in (character fills the
+  // screen), ride the camera UP over the wall instead: find the smallest extra
+  // pitch that restores a comfortable distance (walls have no ceilings, so
+  // lifting always has an escape), then smooth toward it.
+  var need = 0;
+  for (var lift = 0; ; lift += 0.15) {
+    var ep = Math.min(p.pitch + lift, maxPitch);
+    var t = camRayHit(p, Math.sin(p.yaw) * Math.cos(ep), Math.sin(ep), Math.cos(p.yaw) * Math.cos(ep), want);
+    if (t >= comfy || ep >= maxPitch) { need = ep - p.pitch; break; }
+  }
+  if (p.camLift === undefined) p.camLift = 0;
+  p.camLift += (need - p.camLift) * (need > p.camLift ? 0.25 : 0.08); // lift in fast, settle out slow
+  var ep2 = Math.min(p.pitch + Math.max(0, p.camLift), maxPitch);
+  var dx = Math.sin(p.yaw) * Math.cos(ep2);
+  var dz = Math.cos(p.yaw) * Math.cos(ep2);
+  var dy = Math.sin(ep2);
+  var target = camRayHit(p, dx, dy, dz, want);   // march the ACTUAL ray so we never clip
   if (p.camDist === undefined) p.camDist = target;
   if (target < p.camDist) p.camDist = target;                    // snap in when blocked
   else p.camDist += (target - p.camDist) * 0.12;                 // smooth the recovery back out
@@ -1011,9 +1024,10 @@ function spectate(p, pd, cam, dt) {
   var t = targets[idx];
   p.specName = names[idx];
   var pos = t.x !== undefined ? { x: t.x, z: t.z } : { x: t.mesh.position.x, z: t.mesh.position.z };
-  var tmp = { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch, camDist: p.camDist };
+  var tmp = { x: pos.x, z: pos.z, yaw: p.yaw, pitch: p.pitch, camDist: p.camDist, camLift: p.camLift };
   placeCam(cam, tmp);
   p.camDist = tmp.camDist;
+  p.camLift = tmp.camLift;
 }
 
 function viewRect(p) {
