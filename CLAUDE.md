@@ -23,6 +23,7 @@ voice; Kevin relays it. Expect playful, kid-driven feature requests.
 | File | What |
 |---|---|
 | `toot-and-scoot.html` | THE game. Single self-contained file (~2700 lines). |
+| `play.py` | Launcher: double-click → local web server on port 8765 + auto-opens the game (vite-style). Close the console window to stop. |
 | `boom-bots-arena.html` | Old 2D prototype. Frozen; don't maintain. |
 | `ottos-block-world.html` | Old 3D block-world demo. Frozen; don't maintain. |
 
@@ -45,9 +46,16 @@ voice; Kevin relays it. Expect playful, kid-driven feature requests.
 
 ## Hard invariants (do not break)
 
-- Single file, works from `file://`, offline except the Three.js r128 CDN
-  `<script>` tag. No build tools, no frameworks, no image assets — all textures
-  are painted in code onto canvas (`THEMES`), all audio is Web Audio synthesis.
+- Runs fully local and offline (except the Three.js r128 CDN `<script>` tag)
+  via `play.py` (local server, port 8765 — fixed so the localStorage
+  leaderboard origin never changes). No build tools, no bundlers, no
+  frameworks — plain files served as-is, edit-and-refresh. Multi-file layout
+  and local binary assets (e.g., embedded/fetched `.glb`) are now PERMITTED
+  since the game is served over HTTP, but don't split the file or add assets
+  without a reason; today the game is still one self-contained file that also
+  works from `file://`. Textures are painted in code onto canvas (`THEMES`),
+  audio is Web Audio synthesis — keep procedural as the default, assets as
+  the exception.
 - ES5-flavored JS (var, function declarations) to match the existing codebase.
 - Controller-first: every screen (title, pause, rules, initials) must be fully
   navigable by gamepad; keyboard+mouse always works for P1.

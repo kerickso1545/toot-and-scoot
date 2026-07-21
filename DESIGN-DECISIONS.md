@@ -86,6 +86,21 @@ respect these unless Kevin explicitly changes them.
   a dictation artifact that got fixed), "Super Scoot", "Turbo Toot",
   "Silent But Deadly", "Dutch Oven", "The Big Stinker".
 
+## Distribution (2026-07-21)
+- **Local web server via `play.py`** (double-click → serve on fixed port
+  8765 → auto-open browser, vite-style) replaces plain `file://`
+  double-click as the standard way to run. Rationale: `file://` blocks
+  fetch/XHR of local sidecar files (CORS), which ruled out `.glb` models and
+  multi-file layout; serving over HTTP removes that wall while staying 100%
+  local/offline. Port is FIXED so the localStorage leaderboard origin is
+  stable (changing it would wipe high scores). One-time cost: scores from the
+  `file://` era don't carry over.
+- Public/remote hosting (GitHub Pages, Tailscale) considered and deferred —
+  local server is enough for now.
+- **No build step remains sacred**: plain files served as-is,
+  edit-and-refresh. Multi-file and local assets are allowed but not required;
+  procedural-in-code stays the default aesthetic and workflow.
+
 ## Rejected / reverted ideas (don't resurrect without asking)
 - Online multiplayer (out of scope for a single file).
 - Emergency teleporters (all variants) — replaced by connectivity guarantee.

@@ -1,6 +1,7 @@
 # Activity Log
 
 ## 2026-07-21
+- 13:52 [Personal/otto] - Added play.py launcher (double-click → local server on fixed port 8765 → auto-opens game, vite-style; reuses running server). Decision: local HTTP serving replaces file:// as the standard run method, unblocking multi-file layout and .glb assets while keeping no-build-step sacred. Updated CLAUDE.md invariants, DESIGN-DECISIONS.md (new Distribution section), README run instructions, and PLAN-NEXT-LEVEL-3D.md (GLTF verdict REJECTED→DEFERRED). Sandbox-tested: serves game 200, rerun detection works. Needs human test: Windows double-click + browser auto-open; note leaderboard resets once (origin change).
 - 13:38 [Personal/otto] - Wrote PLAN-NEXT-LEVEL-3D.md: multi-agent work order for the visual "next level" upgrade (fart-cloud particle FX, modular animated characters, per-level themes, instancing + camera feel, serialized integration). Corrected external Gemini proposal's stale 2D premise; rejected GLTF/external assets as invariant violations. Awaiting Otto/Kevin approval on themes and character direction.
 
 ## 2026-07-19

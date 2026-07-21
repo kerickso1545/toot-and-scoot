@@ -4,9 +4,14 @@ Games designed by Otto, built with Claude.
 
 ## Toot and Scoot (`toot-and-scoot.html`)
 
-A 3D fart-battle arena game in a bathroom-themed maze. Open the file in any
-browser (needs internet the first time to load the Three.js library). Best
-played with Bluetooth/USB controllers; keyboard + mouse also fully supported.
+A 3D fart-battle arena game in a bathroom-themed maze. **To play:
+double-click `play.py`** — it starts a tiny local server and opens the game
+in your browser automatically (keep the console window open while playing;
+close it to stop). Needs Python 3 installed, and internet the first time to
+load the Three.js library. Opening `toot-and-scoot.html` directly also still
+works, but the high-score leaderboard is saved separately per method — stick
+with `play.py`. Best played with Bluetooth/USB controllers; keyboard + mouse
+also fully supported.
 
 ### Modes
 - **1 player** — level campaign with rising difficulty, scoring, and a

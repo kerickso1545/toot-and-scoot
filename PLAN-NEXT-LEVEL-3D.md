@@ -19,7 +19,7 @@ existing 3D game**, keeping every mechanic, rule, and design decision intact.
 | Gemini idea | Verdict | Why |
 |---|---|---|
 | Three.js + WebGL renderer | Already done | Game is Three.js r128 |
-| GLTFLoader + Poly Pizza models | **REJECTED** | Violates hard invariants: single file, offline after first load, no external assets. Everything stays procedural code-built geometry. |
+| GLTFLoader + Poly Pizza models | **DEFERRED** | Unblocked by the `play.py` local-server decision (2026-07-21) — `.glb` loading now works. Still doing the glow-up procedurally first: parameterized colors/hats iterate faster and match the aesthetic. GLB is the fallback if WS-B's characters underwhelm. |
 | 2D-array maze → 3D geometry | Already done (better) | 6 maze shapes + flood-fill connectivity guarantee |
 | 3rd-person follow camera w/ lerp | Mostly done | Camera exists w/ collision; add position smoothing + FOV kick (WS-D) |
 | InstancedMesh for walls/floor | **ADOPTED** | Real perf win, esp. 3P (4 renders/frame) (WS-D) |
@@ -29,8 +29,10 @@ existing 3D game**, keeping every mechanic, rule, and design decision intact.
 
 ### Non-negotiable invariants (from CLAUDE.md — every agent must comply)
 
-1. Single self-contained HTML file, works from `file://`, offline except the
-   Three.js r128 CDN tag. No build tools, no frameworks, no image/model assets.
+1. Fully local/offline, served via `play.py` (fixed port 8765). No build
+   tools, no bundlers, no frameworks — plain files, edit-and-refresh.
+   Multi-file and local assets permitted but not required; the game currently
+   stays one self-contained file unless a workstream has a concrete reason.
 2. All textures canvas-painted in code; all audio Web Audio synthesis.
 3. ES5-flavored JS (`var`, function declarations).
 4. Controller-first UI; keyboard+mouse always works for P1.
