@@ -60,32 +60,70 @@ existing 3D game**, keeping every mechanic, rule, and design decision intact.
 5. **Faster** — instanced floor/wall rendering so 3P split screen stays at
    60 FPS as levels grow denser.
 
-## 3. Parallelization strategy (the hard part: one 2,717-line file)
+## 3. Parallelization strategy — REVISED 2026-07-21: modularize first
 
-A single shared file means naive parallel edits will collide. The strategy:
+The single-file constraint is retired (see DESIGN-DECISIONS.md Distribution:
+`play.py` serves the game over local HTTP). That flips the analysis: instead
+of four agents fighting over one 2,717-line file with region-ownership rules,
+we spend one serialized step splitting the file, then run genuinely parallel
+workstreams with file-level ownership and near-zero merge conflicts.
 
-- **Parallel development, serialized integration.** Each workstream agent gets
-  its own git branch (or worktree) cut from the same base commit and delivers
-  a working, syntax-checked file. An integration agent merges in a fixed
-  order, re-verifying after each merge. Agents never merge their own work.
-- **Region ownership.** Each workstream is assigned specific functions/regions
-  (below). Agents may ADD new functions freely but may only MODIFY functions
-  they own. If a workstream needs a change in another's region, it documents
-  the request in its handoff notes instead of making the edit.
-- **Shared hook contract.** All new per-frame work is exposed as exactly one
-  entry point per workstream, called from `animate()`:
-  - `updateFX(dt)` (WS-A), `updateCharacterAnim(dt)` (WS-B),
-    `updateCameraFeel(p, dt)` (WS-D, called inside `placeCam`).
-  The integration agent wires these calls; workstream agents ship the
-  functions plus a one-line comment showing where the call belongs. This makes
-  `animate()` — the highest-collision region — integrator-owned.
-- **Verification per merge**: syntax check
-  (`node --check` on the extracted script per CLAUDE.md), code-trace of the
-  touched systems, then a human playtest checklist for Kevin & Otto at the end.
+### Phase 0 — Modularization (one agent, serialized, behavior-neutral)
 
-**Merge order** (least→most invasive): WS-C (themes; mostly additive data) →
-WS-D (buildWorld/camera) → WS-B (character meshes/anim) → WS-A (FX; touches
-`explode` which must land after WS-D's instancing settles crate handling).
+Split `toot-and-scoot.html` into plain files loaded via ordered `<script>`
+tags. **NOT ES modules** — the codebase is ES5 globals throughout; rewiring
+~100 globals into import/export is high-risk churn for zero player value.
+Plain script tags keep every function and variable exactly as-is (top-level
+`var`/function declarations in classic scripts share one global scope), so
+the refactor is mechanical cut-and-paste in dependency order. (Bonus: script
+tags aren't subject to the `file://` fetch restriction, so even the direct
+double-click fallback keeps working.)
+
+Target layout (~8 files, each mapping to a workstream's territory):
+
+| File | Contents (from ARCHITECTURE.md systems) | Owner after split |
+|---|---|---|
+| `index.html` | markup, overlay/HUD/menus DOM, ordered script tags | WS-E |
+| `css/style.css` | the `<style>` block | WS-E |
+| `js/constants.js` | balance constants, PU tables, `FARTS`, `MAZES` | shared (read-mostly) |
+| `js/theme.js` | `THEMES`, `canvasTex`, `applyTheme` | WS-C |
+| `js/audio.js` | fart synthesis, `snd()` | shared |
+| `js/meshes.js` | `makeHat`, `makeBotMesh`, `makePlayerMesh` | WS-B |
+| `js/world.js` | `buildWorld`, `insideShape`, `pillarAt`, `findSpawn`, grid helpers | WS-D |
+| `js/fx.js` | explosion/dome/preview visuals (extracted), new FX pool | WS-A |
+| `js/ui.js` | menus, rules, initials, leaderboard, HUD, pad status | WS-E |
+| `js/main.js` | state globals, lifecycle, `animate()`, bots, players, cameras | WS-E (hooks by request) |
+
+Rules for the Phase 0 agent: zero behavior change; no renames, no
+reordering of logic, no "while I'm here" cleanups; preserve declaration
+order across files (load order = old top-to-bottom order); `node --check`
+every file; game must boot and play identically. `git mv`-style history
+isn't possible for extraction, so the commit message documents the mapping.
+
+**Gate: Kevin & Otto smoke-test the modularized game before any workstream
+starts** (Claude can't playtest; this refactor is exactly the kind of change
+that looks fine in code-trace and breaks at runtime via load order).
+
+### Phase 1 — Parallel workstreams (revised mechanics)
+
+- **Branch model**: `main` stays untouched/playable. Integration branch
+  `next-level` is cut from main; Phase 0 lands on it first. Workstream
+  branches (`ws-fx`, `ws-characters`, `ws-themes`, `ws-perf`) cut from
+  post-Phase-0 `next-level`. Agents merge back to `next-level` (integrator
+  reviews); `next-level` → `main` only after the final human playtest.
+  Rollback at every level: main is always the last-good game.
+- **File ownership replaces region ownership.** Each agent owns its files
+  (table above) and may freely create new ones. `js/main.js` and
+  `index.html` are integrator-owned: workstreams request hooks (the
+  `updateFX(dt)` / `updateCharacterAnim(dt)` / `updateCameraFeel(p, dt)`
+  contract from the briefs stands) via `HANDOFF-<ws>.md` + a proposed diff.
+- **Merge order matters much less now.** Independent files merge in any
+  order; only the `main.js` hook wiring is serialized (integrator applies
+  all four in one pass). WS-C/WS-D still coordinate through the `THEMES` key
+  contract, not code edits.
+- **Verification per merge**: `node --check` per changed file, code-trace of
+  contracts, boot check via `play.py` + curl (server returns 200 on all
+  scripts — catches missing/renamed files), human playtest at the end.
 
 ## 4. Workstream briefs
 
@@ -219,11 +257,12 @@ boss fight, shimmer/mask on new bodies).
 
 Each agent receives: CLAUDE.md, ARCHITECTURE.md, DESIGN-DECISIONS.md, this
 plan (their brief + the invariants + the contract sections of adjacent
-workstreams), and a branch cut from the agreed base commit. Standing orders:
-edit `toot-and-scoot.html` in place; ES5 only; only modify owned regions;
-document (don't apply) any needed cross-region one-liners in
-`HANDOFF-<ws>.md`; syntax-check before finishing; commit granularly; do not
-push.
+workstreams), and a branch cut from post-Phase-0 `next-level`. Standing
+orders: ES5 only; edit only owned files (create new ones freely); request
+`main.js`/`index.html` changes via `HANDOFF-<ws>.md` with a proposed diff;
+`node --check` changed files before finishing; commit granularly; do not
+push. Phase 0's agent additionally updates CLAUDE.md (workflow rules 1-2 and
+file table) and ARCHITECTURE.md to describe the new layout.
 
 ## 6. Open questions for Otto & Kevin (answer before kickoff)
 
