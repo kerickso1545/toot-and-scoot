@@ -44,7 +44,9 @@ still works to set a start level directly without the picker.
 
 ### Core mechanics
 - Farts linger, then spread fast in four directions; blasts punch through
-  crates but stop at walls — and now erupt as **billowing green gas clouds**
+  crates but stop at walls. Your own farts never set each other off (Extra
+  Gas double-toots keep their own fuses) — but a rival's fart caught in your
+  blast still chains — and now erupt as **billowing green gas clouds**
   that swell, drift, and fade (boss blasts get their own menacing tint),
   with a little screen shake when one goes off near you (toggle it off in
   Settings: "Screen shake")

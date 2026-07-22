@@ -124,10 +124,13 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   the group's position/rotation.y/scale stay main.js-owned (boss 2.2× scale
   composes safely).
 - **Bombs/blasts**: `dropBombFor`, `placeBomb(gx,gz,range,owner,opts)`
-  (opts: `fuse`, `hidden` (S.B.D.), `quiet` (bean trail)), `explode` (cross
-  blast, punches through crates, stops at walls 1/3, chains, drops power-ups,
-  scores crates to `owner.score`), `explosions[]` entries carry `owner` for
-  kill attribution.
+  (opts: `fuse`, `hidden` (S.B.D.), `quiet`/`trail` (bean trail)), `explode`
+  (cross blast, punches through crates, stops at walls 1/3, drops power-ups,
+  scores crates to `owner.score`). CHAIN RULES (both explode() and the boss
+  special): a blast never detonates a same-owner bomb (Extra Gas double-toots
+  keep their own fuses) and never detonates `b.trail` bombs; different-owner
+  non-trail bombs chain. `explosions[]` entries carry `owner` for kill
+  attribution.
 - **Power-ups**: `spawnPowerup` (2% rainbow Extra Life, 10% beans, else
   passive gas/blast/scoot + active wall/spray/turbo). Passives apply instantly
   with caps `MAX_GAS/MAX_BLAST/MAX_SPEED` (capped → left on floor + message).

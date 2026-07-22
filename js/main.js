@@ -438,10 +438,11 @@ function explode(b) {
       if (grid[z][x] === 1 || grid[z][x] === 3) break;
       tiles.push([x, z]);
       var other = bombAt(x, z);
-      // bean-trail toots NEVER chain: they pop strictly on their own fuses,
-      // in drop order with even spacing, so the eater can actually outrun
-      // their own trail (one blast used to gang-detonate the whole line)
-      if (other && !other.trail) explode(other);
+      // chain rules: a blast NEVER detonates another fart from the same
+      // owner (Extra Gas double-toots keep their own fuses — no more blowing
+      // up your second toot with your first), and bean-trail toots never
+      // chain at all. Other owners' farts still chain — crossfire is fun.
+      if (other && !other.trail && other.owner !== b.owner) explode(other);
       if (grid[z][x] === 2) {
         removeCrate(x, z);
         if (Math.random() < 0.35) drops.push([x, z]);
@@ -856,7 +857,8 @@ function updateBossSpecial(bot, dt) {
         var m = fxGroundGlow(x, z, true);
         explosions.push({ gx: x, gz: z, timer: 0.5, mesh: m, owner: bot });
         var other = bombAt(x, z);
-        if (other && !other.trail) explode(other);   // trail toots keep their own fuses
+        // same chain rules as explode(): no same-owner chains, no trail chains
+        if (other && !other.trail && other.owner !== bot) explode(other);
       });
       bot.warnOrigin = null;
       fart(FARTS['The Big Stinker'], true);
