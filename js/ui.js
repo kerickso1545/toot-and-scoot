@@ -70,7 +70,13 @@ function renderScoreboard() {
   var el = document.getElementById('scoreboard');
   if (!s.length) { el.innerHTML = ''; return; }
   el.innerHTML = 'HIGH SCORES<br>' + s.map(function (r, i) {
-    return '<span class="scorerow">' + (i + 1) + '. ' + r.initials + ' ' + ('' + r.score) + ' pts (level ' + r.level + ')</span>';
+    // every entry banks its difficulty + play mode; pre-tag entries show plain.
+    // mode is only displayed when it isn't the usual 1P (the board is 1P-only
+    // today, but the data is future-proofed).
+    var tag = 'level ' + r.level +
+      (r.diff !== undefined ? ' &middot; ' + ['Easy', 'Medium', 'Hard'][r.diff] : '') +
+      (r.mode && r.mode !== '1P' ? ' &middot; ' + r.mode : '');
+    return '<span class="scorerow">' + (i + 1) + '. ' + r.initials + ' ' + ('' + r.score) + ' pts (' + tag + ')</span>';
   }).join('<br>');
 }
 function renderInitials() {
@@ -84,6 +90,10 @@ function showInitials(sc) {
   initialsActive = true;
   initLetters = ['A', 'A', 'A'];
   initSlot = 0;
+  // snapshot difficulty + mode NOW (globals could be re-picked on the title
+  // screen before the letters are finished)
+  sc.diff = difficulty;
+  sc.mode = numPlayers + 'P';
   pendingScore = sc;
   document.getElementById('initScore').textContent = sc.score + ' points — level ' + sc.level;
   document.getElementById('initials').style.display = 'block';
@@ -103,7 +113,8 @@ function finishInitials() {
   initialsActive = false;
   document.getElementById('initials').style.display = 'none';
   var sc = loadScores();
-  sc.push({ initials: initLetters.join(''), score: pendingScore.score, level: pendingScore.level });
+  sc.push({ initials: initLetters.join(''), score: pendingScore.score, level: pendingScore.level,
+            diff: pendingScore.diff, mode: pendingScore.mode });
   sc.sort(function (a, b) { return b.score - a.score; });
   try { localStorage.setItem('tootScootScores', JSON.stringify(sc.slice(0, 10))); } catch (e) {}
   renderScoreboard();
