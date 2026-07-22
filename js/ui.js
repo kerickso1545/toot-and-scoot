@@ -29,7 +29,10 @@ function hideRules(ev) {
 
 // ---- title menu controller navigation ----
 var MENU_ROWS = ['modebtns', 'colorbtns', 'hatbtns', 'startbtns', 'rulesrow'];
-var mRow = 3, mCol = 0;
+// boss mode (play.py --boss): a start-level picker row joins the menu grid,
+// fully d-pad navigable like every other row
+if (bossMode) MENU_ROWS.splice(3, 0, 'levelbtns');
+var mRow = MENU_ROWS.indexOf('startbtns'), mCol = 0;
 function titleButtons(rid) {
   return Array.prototype.slice.call(document.getElementById(rid).querySelectorAll('button'));
 }
@@ -229,6 +232,15 @@ function resultsAction(act) {
     renderTitleFocus();
     updatePadStatus();
   }
+}
+
+function pickLevel(n, el, ev) {
+  // boss-mode start-level picker (row only visible when launched with --boss)
+  if (ev) ev.stopPropagation();
+  startAtLevel = n;
+  var lb = document.querySelectorAll('#levelbtns .hatbtn');
+  for (var i = 0; i < lb.length; i++) lb[i].classList.remove('hatsel');
+  el.classList.add('hatsel');
 }
 
 function pickHat(t, el, ev) {

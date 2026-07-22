@@ -175,9 +175,12 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   initials entry UI (`initialsActive` state machine). Entries store
   `{initials, score, level, diff, mode}` — difficulty/mode snapshotted in
   `showInitials`; scoreboard rows render the difficulty tag.
-- **Boss mode / start level**: `startAtLevel` parsed from `?level=N`
-  (clamped 1-99) at load; `startGame` starts every game there. Set via
-  `play.py --level N`.
+- **Boss mode / start level**: `startAtLevel` + `bossMode` parsed from
+  `?level=N` / `?boss=1` in constants.js (BEFORE ui.js builds MENU_ROWS);
+  `startGame` starts every game at `startAtLevel`. With `?boss=1` the
+  `levelrow` picker (`levelbtns`, `pickLevel`) is revealed at main.js load
+  time and spliced into MENU_ROWS for gamepad nav. Set via `play.py --boss`
+  and/or `--level N`.
 - **Scoring**: 10 crate / 100 rival / 200 player KO / 500 level-or-round win /
   boss 100 per hit + 1000 kill. Credited to `explosion.owner.score` when the
   owner is a human (bots have no `score` field — guarded by

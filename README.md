@@ -15,9 +15,10 @@ works, but the high-score leaderboard is saved separately per method — stick
 with `play.py`. Best played with Bluetooth/USB controllers; keyboard + mouse
 also fully supported.
 
-**Boss mode**: `python play.py --level 5` starts every new game at that level
-— bosses are every 5th level, so `--level 5`, `10`, `15`... jumps straight to
-the fight (higher levels are harder, just like getting there the long way).
+**Boss mode**: `python play.py --boss` adds a "Start at level" picker to the
+main menu (1 / 5 / 10 / 15 / 20 / 25 — bosses are every 5th level, and higher
+levels are harder, just like getting there the long way). `--level N` also
+still works to set a start level directly without the picker.
 
 ### Modes
 - **1 player** — level campaign with rising difficulty, scoring, and a

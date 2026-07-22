@@ -4,6 +4,17 @@ var COLS = 15, ROWS = 13, TS = 2;           // tile size in world units
 // messages all ask isBossLevel().
 var BOSS_EVERY = 5;
 function isBossLevel(l) { return l % BOSS_EVERY === 0; }
+// ---- boss mode / start level (set by play.py --boss / --level N) ----
+// Parsed here (before ui.js builds the title-menu rows) — depends only on the
+// browser's location global. bossMode shows the start-level picker row;
+// startAtLevel is where every new game begins.
+var startAtLevel = 1, bossMode = false;
+(function () {
+  if (typeof location === 'undefined') return;   // headless test harnesses
+  bossMode = /[?&]boss=1/.test(location.search);
+  var m = /[?&]level=(\d+)/.exec(location.search);
+  if (m) startAtLevel = Math.max(1, Math.min(99, parseInt(m[1], 10) || 1));
+})();
 var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 // ---- balance caps for passive upgrades (players AND rivals) ----

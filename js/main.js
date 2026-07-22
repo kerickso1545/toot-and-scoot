@@ -46,13 +46,9 @@ var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
-// ---- boss mode: play.py --level N opens the game with ?level=N so every new
-// game starts at that level (great for jumping straight to a boss fight) ----
-var startAtLevel = 1;
-(function () {
-  var m = /[?&]level=(\d+)/.exec(location.search);
-  if (m) startAtLevel = Math.max(1, Math.min(99, parseInt(m[1], 10) || 1));
-})();
+// (startAtLevel / bossMode live in constants.js — parsed before ui.js builds
+// the title-menu rows; the boss-mode level picker row is revealed at the
+// bottom of this file with the other load-time side effects)
 // level-start countdown ("3, 2, 1, SCOOT!!") — dt-driven in animate(), NOT a
 // timeout, so pausing freezes it and quitting cleans it up like everything else
 var countdownT = 0, countdownPhase = -1;
@@ -1773,6 +1769,15 @@ function animate() {
 buildWorld();
 camera.position.set(COLS * TS / 2, 22, ROWS * TS + 10);
 camera.lookAt(COLS * TS / 2, 0, ROWS * TS / 2);
+if (bossMode) {
+  // reveal the start-level picker and highlight whatever --level preselected
+  document.getElementById('levelrow').style.display = 'block';
+  var lvlBtns = document.querySelectorAll('#levelbtns .hatbtn');
+  for (var lbI = 0; lbI < lvlBtns.length; lbI++) {
+    lvlBtns[lbI].classList.toggle('hatsel',
+      parseInt(lvlBtns[lbI].getAttribute('data-lvl'), 10) === startAtLevel);
+  }
+}
 renderScoreboard();
 renderTitleFocus();
 updatePadStatus();
