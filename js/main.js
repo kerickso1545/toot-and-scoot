@@ -104,6 +104,24 @@ function carryStats(prevPlayer) {
            bestT: prevPlayer.bestT === undefined ? null : prevPlayer.bestT };
 }
 
+function spawnFacing(sp, defYaw) {
+  // face the player toward their bomb-escape route (or any open neighbor) so
+  // nobody spawns staring into a wall wondering where the arena went.
+  // yaw convention: forward = (-sin(yaw), -cos(yaw)) — see controlHuman.
+  var dx = 0, dz = 0;
+  var esc = spawnEscape(sp[0], sp[1]);
+  if (esc) { dx = esc[0][0] - sp[0]; dz = esc[0][1] - sp[1]; }
+  else {
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var i = 0; i < dirs.length; i++) {
+      var nx = sp[0] + dirs[i][0], nz = sp[1] + dirs[i][1];
+      if (grid[nz] && grid[nz][nx] !== undefined && grid[nz][nx] !== 1) { dx = dirs[i][0]; dz = dirs[i][1]; break; }
+    }
+  }
+  if (!dx && !dz) return defYaw;
+  return Math.atan2(-dx, -dz);
+}
+
 function startLevel(keepStats) {
   // clean up everything left over from the previous round
   resetTransientUI();
@@ -143,7 +161,7 @@ function startLevel(keepStats) {
   var prev = keepStats && !twoPlayer && player ? player : null;   // solo also carries upgrades + held item
   player = {
     x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(playerColor, playerHat), baseColor: playerColor,
-    yaw: Math.PI + 0.6, pitch: 0.55,
+    yaw: spawnFacing(sp1, Math.PI + 0.6), pitch: 0.55,
     speed:    prev ? prev.speed    : 5,
     maxBombs: prev ? prev.maxBombs : 1,
     range:    prev ? prev.range    : 2,
@@ -159,18 +177,20 @@ function startLevel(keepStats) {
     superUsed: false
   };
   player.mesh.position.set(c.x, 0, c.z);
+  player.mesh.rotation.y = player.yaw + Math.PI;   // body faces where the camera looks
   if (twoPlayer) {
     var sp2 = levelSpawns[1] || sp1;
     var c2 = tileCenter(sp2[0], sp2[1]);
     player2 = {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
-      yaw: 0.6, pitch: 0.55,
+      yaw: spawnFacing(sp2, 0.6), pitch: 0.55,
       speed: 5, maxBombs: 1, range: 2, held: null, wins: cs2.wins, lives: cs2.lives, score: cs2.score, stamina: 100,
       kills: cs2.kills, crates: cs2.crates, selfGas: cs2.selfGas, itemsUsed: cs2.itemsUsed, bestT: cs2.bestT,
       maskTime: 0, suppress: true, superType: superType, superUsed: false
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
+    player2.mesh.rotation.y = player2.yaw + Math.PI;
     if (numPlayers >= 3) {
       var sp3 = levelSpawns[2] || sp1;
       var c3 = tileCenter(sp3[0], sp3[1]);
@@ -179,12 +199,13 @@ function startLevel(keepStats) {
       player3 = {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
-        yaw: 2.5, pitch: 0.55,
+        yaw: spawnFacing(sp3, 2.5), pitch: 0.55,
         speed: 5, maxBombs: 1, range: 2, held: null, wins: cs3.wins, lives: cs3.lives, score: cs3.score, stamina: 100,
         kills: cs3.kills, crates: cs3.crates, selfGas: cs3.selfGas, itemsUsed: cs3.itemsUsed, bestT: cs3.bestT,
         maskTime: 0, suppress: true, superType: superType, superUsed: false
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
+      player3.mesh.rotation.y = player3.yaw + Math.PI;
       cameraTop.position.set(COLS * TS / 2, 27, ROWS * TS / 2 + 7);
       cameraTop.lookAt(COLS * TS / 2, 0, ROWS * TS / 2);
     } else {

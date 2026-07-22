@@ -42,11 +42,13 @@ function spawnEscape(x, z) {
   }
   return null;
 }
-function findSpawn(tx, tz, used, minDist, skipEscapeCheck) {
+function findSpawn(tx, tz, used, minDist, skipEscapeCheck, avoid, avoidDist) {
   // scans EVERY open tile; minDist is the required spacing from already-used
   // spawns and can be relaxed (down to 0) when the maze is tight.
   // Tiles without a survivable bomb-escape route (spawnEscape) are rejected
   // unless skipEscapeCheck is set (absolute last resort).
+  // avoid/avoidDist: an extra keep-away list (used to hold bots clear of the
+  // human spawns so nobody gets ambushed the instant the countdown ends).
   var best = null, bd = 1e9;
   for (var z = 1; z < ROWS - 1; z++) {
     for (var x = 1; x < COLS - 1; x++) {
@@ -56,6 +58,11 @@ function findSpawn(tx, tz, used, minDist, skipEscapeCheck) {
       for (var k in used) {
         var p = k.split(',');
         if (Math.abs(p[0] - x) + Math.abs(p[1] - z) < minDist) { tooClose = true; break; }
+      }
+      if (!tooClose && avoid) {
+        for (var ai = 0; ai < avoid.length; ai++) {
+          if (Math.abs(avoid[ai][0] - x) + Math.abs(avoid[ai][1] - z) < avoidDist) { tooClose = true; break; }
+        }
       }
       if (tooClose) continue;
       var d = Math.abs(x - tx) + Math.abs(z - tz);
@@ -116,37 +123,66 @@ function buildWorld() {
     regions[ri].forEach(function (t) { grid[t[1]][t[0]] = 1; });
   }
   // find safe spawn pockets (corners may not exist in a circle or triangle).
-  // guarantee enough unique spawns for every human + up to 6 bots on ANY maze
-  // shape: preferred corner/edge targets first at the normal spacing, then
-  // progressively relax the min-distance rule (3 -> 2 -> 1 -> 0); findSpawn
-  // itself scans every remaining open tile, so if the arena has open floor
-  // we will find it.
+  // TWO-PHASE selection so the humans always come first:
+  //   Phase 1 — humans. An escape route (spawnEscape) is NON-NEGOTIABLE, and
+  //   humans claim the best spacing (4 apart, relaxing only if the maze is
+  //   genuinely tight) before any bot takes a tile.
+  //   Phase 2 — bots. Besides spacing among themselves, bots must stay at
+  //   least botGap tiles (Manhattan) from EVERY human spawn — no more getting
+  //   tooted by a neighbor the instant the countdown ends. The gap relaxes
+  //   pass by pass only when the arena runs out of room, and an escape-less
+  //   tile is taken dead last (better a doomed bot than a missing one — 1P
+  //   level-clear needs at least one rival).
   levelSpawns = [];
   var used = {};
   var spawnTargets = [[1,1],[COLS-2,ROWS-2],[COLS-2,1],[1,ROWS-2],[7,1],[7,ROWS-2],[COLS-2,6],[1,6]];
-  var spawnsNeeded = numPlayers + 6;
-  var spacingPasses = [3, 2, 1, 0];
-  for (var spi = 0; spi < spacingPasses.length && levelSpawns.length < spawnsNeeded; spi++) {
-    for (var sti = 0; sti < spawnTargets.length && levelSpawns.length < spawnsNeeded; sti++) {
-      var s = findSpawn(spawnTargets[sti][0], spawnTargets[sti][1], used, spacingPasses[spi]);
-      if (s && !used[s[0] + ',' + s[1]]) {
-        used[s[0] + ',' + s[1]] = true;
-        levelSpawns.push(s);
+  var humanSpawns = [];
+  var humanPasses = [4, 3, 2, 1, 0];
+  for (var hp = 0; hp < humanPasses.length && humanSpawns.length < numPlayers; hp++) {
+    for (var hti = 0; hti < spawnTargets.length && humanSpawns.length < numPlayers; hti++) {
+      var hs = findSpawn(spawnTargets[hti][0], spawnTargets[hti][1], used, humanPasses[hp]);
+      if (hs && !used[hs[0] + ',' + hs[1]]) {
+        used[hs[0] + ',' + hs[1]] = true;
+        humanSpawns.push(hs);
       }
     }
   }
-  // absolute last resort: if the escape-route requirement left us short of
-  // spawns (shouldn't happen on any current maze), take escape-less tiles
-  // rather than spawning nobody
-  for (var sp2 = 0; sp2 < spacingPasses.length && levelSpawns.length < spawnsNeeded; sp2++) {
-    for (var st2 = 0; st2 < spawnTargets.length && levelSpawns.length < spawnsNeeded; st2++) {
-      var s2 = findSpawn(spawnTargets[st2][0], spawnTargets[st2][1], used, spacingPasses[sp2], true);
-      if (s2 && !used[s2[0] + ',' + s2[1]]) {
-        used[s2[0] + ',' + s2[1]] = true;
-        levelSpawns.push(s2);
+  // extreme fallback for humans (no escape-valid tile anywhere — shouldn't
+  // happen on any current maze): distinct open tiles still beat stacking
+  for (var hf = 0; hf < humanPasses.length && humanSpawns.length < numPlayers; hf++) {
+    for (var hfi = 0; hfi < spawnTargets.length && humanSpawns.length < numPlayers; hfi++) {
+      var hx = findSpawn(spawnTargets[hfi][0], spawnTargets[hfi][1], used, humanPasses[hf], true);
+      if (hx && !used[hx[0] + ',' + hx[1]]) {
+        used[hx[0] + ',' + hx[1]] = true;
+        humanSpawns.push(hx);
       }
     }
   }
+  var botSpawns = [];
+  var botsNeeded = 6;
+  // [spacing among bots, min gap from any human] — relaxed in order
+  var botPasses = [[3, 5], [2, 4], [2, 3], [1, 3], [1, 2], [0, 2]];
+  for (var bp = 0; bp < botPasses.length && botSpawns.length < botsNeeded; bp++) {
+    for (var bti = 0; bti < spawnTargets.length && botSpawns.length < botsNeeded; bti++) {
+      var bs = findSpawn(spawnTargets[bti][0], spawnTargets[bti][1], used, botPasses[bp][0], false, humanSpawns, botPasses[bp][1]);
+      if (bs && !used[bs[0] + ',' + bs[1]]) {
+        used[bs[0] + ',' + bs[1]] = true;
+        botSpawns.push(bs);
+      }
+    }
+  }
+  // absolute last resort for bots: escape-less tiles, human gap shrinking to 0
+  var botLastPasses = [[0, 2], [0, 1], [0, 0]];
+  for (var bl = 0; bl < botLastPasses.length && botSpawns.length < botsNeeded; bl++) {
+    for (var bli = 0; bli < spawnTargets.length && botSpawns.length < botsNeeded; bli++) {
+      var b2 = findSpawn(spawnTargets[bli][0], spawnTargets[bli][1], used, botLastPasses[bl][0], true, humanSpawns, botLastPasses[bl][1]);
+      if (b2 && !used[b2[0] + ',' + b2[1]]) {
+        used[b2[0] + ',' + b2[1]] = true;
+        botSpawns.push(b2);
+      }
+    }
+  }
+  levelSpawns = humanSpawns.concat(botSpawns);
   // clear a safe pocket around every final spawn, and carve the crates off
   // the bomb-escape route so the first toot is always survivable
   levelSpawns.forEach(function (s) {
