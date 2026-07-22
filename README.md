@@ -72,9 +72,10 @@ still works to set a start level directly without the picker.
 - **Animated characters**: everyone waddles as they run, leans into turns,
   blinks, breathes when idle, scrunches down for a fart, and spins out when
   gassed (in multiplayer) — hats and colors as always
-- **Boss every 5th level**: The Big Stinker — 1000 HP, 100 damage per blast,
-  health bar, boss arena. He dodges any fart he can see, but he **can't see
-  farts dropped behind his back** — bait him, circle around, sneak-toot
+- **Boss every 5th level**: The Big Stinker — 600/800/1000 HP by difficulty
+  (6-10 hits), 100 damage per blast, health bar, boss arena. He dodges any
+  fart he can see, but he **can't see farts dropped behind his back** — bait
+  him, circle around, sneak-toot
 - **Six rivals** with signature hats and synthesized fart voices; smarter,
   faster, and more numerous as levels climb — and they always spawn a safe
   distance from you (you spawn facing your escape route, never a wall)
@@ -84,7 +85,11 @@ still works to set a start level directly without the picker.
   split-screen level change
 - **Results screen** after every run: score, level reached, rivals gassed,
   TP shredded, self-gasses, items used, and fastest level — with Retry same
-  setup / Change setup / Main menu
+  setup / Change setup / Main menu. **Retry continues from the level you
+  died on** (fresh score); the title screen always starts a new campaign
+- **Lego-style camera**: a raised follow angle that clears the maze walls, so
+  the view never gets shoved into your character's face — and if a wall does
+  briefly block your camera, you see your character glowing right through it
 - **Scoring**: 10 per crate, 100 per rival, 200 per player KO, 500 per
   level/round win, boss hits 100 each + 1000 bonus
 - HUD: kart-racer style panels, item boxes with button labels, minimap

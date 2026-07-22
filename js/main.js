@@ -44,6 +44,13 @@ applyTheme('bathroom');
 var grid, crateMeshes, bombs, explosions, powerups, bots, walls, domes;
 var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
+// results-race guard: true between endGame() and the results/initials panel
+// actually appearing (600ms) — blocks the pad Start path from starting a new
+// game in that window and silently eating a qualifying high score
+var resultsPending = false;
+// "Retry same setup" continues from the level you died on (fresh stats);
+// title-screen starts always begin at startAtLevel
+var retryLevel = 0;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
 // (startAtLevel / bossMode live in constants.js — parsed before ui.js builds
@@ -107,6 +114,46 @@ function carryStats(prevPlayer) {
            bestT: prevPlayer.bestT === undefined ? null : prevPlayer.bestT };
 }
 
+// ---- occlusion silhouette ("ghost") ----
+// A flat, see-through copy of each human's character, drawn ON TOP of the
+// world (depthTest off) only in that player's own viewport and only while
+// their camera boom is blocked (p.camOccluded). You always know where you
+// are behind a wall, and the camera never has to zoom into your face.
+function makeGhostFor(p) {
+  if (!p || !p.mesh) return;
+  // clone(true) JSON-copies userData, and the rig's userData holds Object3D
+  // refs (circular) — swap it out around the clone
+  var savedUD = p.mesh.userData;
+  p.mesh.userData = {};
+  var g = p.mesh.clone(true);
+  p.mesh.userData = savedUD;
+  var mat = new THREE.MeshBasicMaterial({
+    color: p.baseColor, transparent: true, opacity: 0.35,
+    depthTest: false, depthWrite: false
+  });
+  g.traverse(function (o) {
+    if (o.isMesh) { o.material = mat; o.renderOrder = 999; }
+  });
+  g.visible = false;
+  scene.add(g);
+  p.ghost = g;
+  p.ghostMat = mat;
+}
+function removeGhost(p) {
+  if (p && p.ghost) {
+    scene.remove(p.ghost);
+    if (p.ghostMat) p.ghostMat.dispose();
+    p.ghost = null;
+    p.ghostMat = null;
+  }
+}
+function showGhostFor(viewP) {
+  // called right before each viewport render: only viewP's own ghost may show
+  humans().forEach(function (h) {
+    if (h.ghost) h.ghost.visible = running && !gameOver && h === viewP && h.alive && !!h.camOccluded;
+  });
+}
+
 function spawnFacing(sp, defYaw) {
   // face the player toward their bomb-escape route (or any open neighbor) so
   // nobody spawns staring into a wall wondering where the arena went.
@@ -115,10 +162,15 @@ function spawnFacing(sp, defYaw) {
   var esc = spawnEscape(sp[0], sp[1]);
   if (esc) { dx = esc[0][0] - sp[0]; dz = esc[0][1] - sp[1]; }
   else {
+    // fallback spawn with no escape route: prefer facing OPEN floor, only
+    // then settle for a crate (never a permanent wall)
     var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (var i = 0; i < dirs.length; i++) {
-      var nx = sp[0] + dirs[i][0], nz = sp[1] + dirs[i][1];
-      if (grid[nz] && grid[nz][nx] !== undefined && grid[nz][nx] !== 1) { dx = dirs[i][0]; dz = dirs[i][1]; break; }
+    for (var pass = 0; pass < 2 && !dx && !dz; pass++) {
+      for (var i = 0; i < dirs.length; i++) {
+        var nx = sp[0] + dirs[i][0], nz = sp[1] + dirs[i][1];
+        if (!grid[nz] || grid[nz][nx] === undefined) continue;
+        if (pass === 0 ? grid[nz][nx] === 0 : grid[nz][nx] !== 1) { dx = dirs[i][0]; dz = dirs[i][1]; break; }
+      }
     }
   }
   if (!dx && !dz) return defYaw;
@@ -135,6 +187,7 @@ function startLevel(keepStats) {
   if (player && player.mesh) scene.remove(player.mesh);
   if (player2 && player2.mesh) scene.remove(player2.mesh);
   if (player3 && player3.mesh) scene.remove(player3.mesh);
+  removeGhost(player); removeGhost(player2); removeGhost(player3);
   if (walls) walls.forEach(function (w) { scene.remove(w.mesh); });
   if (domes) domes.forEach(function (d) { scene.remove(d.mesh); });
   bombs = []; explosions = []; powerups = []; bots = []; walls = []; domes = [];
@@ -164,7 +217,7 @@ function startLevel(keepStats) {
   var prev = keepStats && !twoPlayer && player ? player : null;   // solo also carries upgrades + held item
   player = {
     x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(playerColor, playerHat), baseColor: playerColor,
-    yaw: spawnFacing(sp1, Math.PI + 0.6), pitch: 0.55,
+    yaw: spawnFacing(sp1, Math.PI + 0.6), pitch: 0.7,
     speed:    prev ? prev.speed    : 5,
     maxBombs: prev ? prev.maxBombs : 1,
     range:    prev ? prev.range    : 2,
@@ -187,7 +240,7 @@ function startLevel(keepStats) {
     player2 = {
       x: c2.x, z: c2.z, alive: true,
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
-      yaw: spawnFacing(sp2, 0.6), pitch: 0.55,
+      yaw: spawnFacing(sp2, 0.6), pitch: 0.7,
       speed: 5, maxBombs: 1, range: 2, held: null, wins: cs2.wins, lives: cs2.lives, score: cs2.score, stamina: 100,
       kills: cs2.kills, crates: cs2.crates, selfGas: cs2.selfGas, itemsUsed: cs2.itemsUsed, bestT: cs2.bestT,
       maskTime: 0, suppress: true, superType: superType, superUsed: false
@@ -202,7 +255,7 @@ function startLevel(keepStats) {
       player3 = {
         x: c3.x, z: c3.z, alive: true,
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
-        yaw: spawnFacing(sp3, 2.5), pitch: 0.55,
+        yaw: spawnFacing(sp3, 2.5), pitch: 0.7,
         speed: 5, maxBombs: 1, range: 2, held: null, wins: cs3.wins, lives: cs3.lives, score: cs3.score, stamina: 100,
         kills: cs3.kills, crates: cs3.crates, selfGas: cs3.selfGas, itemsUsed: cs3.itemsUsed, bestT: cs3.bestT,
         maskTime: 0, suppress: true, superType: superType, superUsed: false
@@ -254,7 +307,10 @@ function startLevel(keepStats) {
     var bossBot = makeBot(bs[0], bs[1], 0x4e342e, 'The Big Stinker');
     bossBot.mesh.scale.set(2.2, 2.2, 2.2);
     bossBot.boss = true;
-    bossBot.hp = 1000;
+    // boss health scales with difficulty: 6 / 8 / 10 sneak-hits
+    bossBot.hpMax = [600, 800, 1000][difficulty];
+    bossBot.hp = bossBot.hpMax;
+    bossBot.hitCd = 0;
     bossBot.speed = 3.2;
     bossBot.range = 4;
     bossBot.maxBombs = 2;
@@ -275,6 +331,7 @@ function startLevel(keepStats) {
     }
   }
   running = true; gameOver = false;
+  humans().forEach(makeGhostFor);   // BEFORE startCountdown adds badge sprites
   overlay.style.display = 'none';
   levelTime = 0;
   startCountdown();
@@ -359,11 +416,14 @@ function updateCountdown(dt) {
   }
 }
 
-function startGame() {
+function startGame(retry) {
   bumpSession();               // invalidate every delayed callback from the old game
   padDiscMsg = '';
+  resultsPending = false;      // belt-and-braces: never leave the start gate stuck
   assignPads();                // lock controller assignments for this match
-  level = startAtLevel;
+  // retry === true (results panel "Retry same setup"): continue from the level
+  // you died on with fresh stats. Every other start begins at startAtLevel.
+  level = retry === true && retryLevel > 0 ? retryLevel : startAtLevel;
   if (numPlayers === 2) round2p++;
   startLevel(false);
   if (level > 1) {
@@ -417,10 +477,13 @@ function bombAt(x, z) {
 }
 // ---------- bombs ----------
 function dropBombFor(p) {
-  if (!running || !p || !p.alive) return;
+  // countdownT guard: the pad path is frozen in animate(), but keyboard/mouse
+  // handlers call this directly — nothing may act during "3, 2, 1, SCOOT!!"
+  if (!running || countdownT > 0 || !p || !p.alive) return;
   var own = bombs.filter(function (b) { return b.owner === p; }).length;
   var t = tileOf(p);
-  if (own >= p.maxBombs || bombAt(t.x, t.z)) return;
+  if (own >= p.maxBombs) { cappedFx(p, 'Wait for your toot!', 'bomb'); return; }
+  if (bombAt(t.x, t.z)) { cappedFx(p, 'Toot already here!', 'bomb'); return; }
   placeBomb(t.x, t.z, p.range, p);
   charSquash(p);
 }
@@ -454,9 +517,10 @@ function explode(b) {
       var other = bombAt(x, z);
       // chain rules: a blast NEVER detonates another fart from the same
       // owner (Extra Gas double-toots keep their own fuses — no more blowing
-      // up your second toot with your first), and bean-trail toots never
-      // chain at all. Other owners' farts still chain — crossfire is fun.
-      if (other && !other.trail && other.owner !== b.owner) explode(other);
+      // up your second toot with your first), bean-trail toots never chain,
+      // and a hidden S.B.D. keeps its secret (always pops on its own fuse).
+      // Other owners' visible farts still chain — crossfire is fun.
+      if (other && !other.trail && !other.hidden && other.owner !== b.owner) explode(other);
       if (grid[z][x] === 2) {
         removeCrate(x, z);
         if (Math.random() < 0.35) drops.push([x, z]);
@@ -787,7 +851,7 @@ function dutchOven(p) {
 }
 
 function useSuperFor(p) {
-  if (!running || !p || !p.alive) return;
+  if (!running || countdownT > 0 || !p || !p.alive) return;
   if (p.superUsed || p.maskTime > 0) { showPMsg(p, 'Superpower used', 'super'); snd(110, 0.15, 'square'); return; }
   var t = p.superType;
   if (t === 'mask') {
@@ -802,12 +866,12 @@ function useSuperFor(p) {
     snd(280, 0.22, 'sine');
   } else if (t === 'sbd') {
     var pt = tileOf(p);
-    if (bombAt(pt.x, pt.z)) { snd(110, 0.15, 'square'); return; }
+    if (bombAt(pt.x, pt.z)) { showPMsg(p, 'Move off your toot first', 'super'); snd(110, 0.15, 'square'); return; }
     p.superUsed = true;
     p.itemsUsed++;
     placeBomb(pt.x, pt.z, p.range + 1, p, { hidden: true });
   } else if (t === 'dutch') {
-    if (!dutchOven(p)) { snd(110, 0.15, 'square'); return; }   // no rival in range — keep it
+    if (!dutchOven(p)) { showPMsg(p, 'No one close enough to trap', 'super'); snd(110, 0.15, 'square'); return; }   // no rival in range — keep it
     p.superUsed = true;
     p.itemsUsed++;
     snd(240, 0.3, 'sine');
@@ -871,8 +935,8 @@ function updateBossSpecial(bot, dt) {
         var m = fxGroundGlow(x, z, true);
         explosions.push({ gx: x, gz: z, timer: 0.5, mesh: m, owner: bot });
         var other = bombAt(x, z);
-        // same chain rules as explode(): no same-owner chains, no trail chains
-        if (other && !other.trail && other.owner !== bot) explode(other);
+        // same chain rules as explode(): no same-owner, trail, or S.B.D. chains
+        if (other && !other.trail && !other.hidden && other.owner !== bot) explode(other);
       });
       bot.warnOrigin = null;
       fart(FARTS['The Big Stinker'], true);
@@ -929,7 +993,7 @@ function turboToot(p) {
   return false;
 }
 function usePowerupFor(p) {
-  if (!running || !p || !p.alive || !p.held) return;
+  if (!running || countdownT > 0 || !p || !p.alive || !p.held) return;
   if (p.held === 'wall') {
     if (!placeWall(p)) { showPMsg(p, 'Tile blocked', 'use'); snd(110, 0.2, 'square'); return; }   // no room there — keep holding it
   }
@@ -985,7 +1049,7 @@ document.addEventListener('mousemove', function (e) {
   if (!locked || !player) return;
   var sens = 0.0025 * camSpeeds[camSpeedIdx];
   player.yaw -= e.movementX * sens;
-  player.pitch = Math.max(0.25, Math.min(1.25, player.pitch + e.movementY * sens));
+  player.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, player.pitch + e.movementY * sens));
 });
 document.addEventListener('keydown', function (e) {
   if (initialsActive) {
@@ -1046,11 +1110,14 @@ function endGame(text) {
   bumpSession();               // cancels pending transitions; new session for our own delay below
   closeMenus();
   padDiscMsg = '';
+  resultsPending = true;       // no new game may start until the panel shows
+  retryLevel = level;          // "Retry same setup" resumes here
   resetTransientUI();          // hides any stale results panel BEFORE the new snapshot below
   hudroot.style.display = 'none';
   bigmsg.textContent = text;
   pendingResults = buildResults();   // snapshot stats before anything rebuilds the players
   later(function () {          // session-guarded: a quit or new game cancels this too
+    resultsPending = false;    // panel is up — starting is allowed again
     if (document.pointerLockElement) document.exitPointerLock();
     // 1P with a qualifying score: initials FIRST (banks the score), then the
     // results panel (via finishInitials). Everyone else: straight to results.
@@ -1069,7 +1136,7 @@ function controlHuman(p, pd, kb, dt) {
   if (pd) {
     var rx = pd.axes[2] || 0, ry = pd.axes[3] || 0;
     if (Math.abs(rx) > 0.2) p.yaw -= rx * 2.8 * sens * dt;
-    if (Math.abs(ry) > 0.2) p.pitch = Math.max(0.25, Math.min(1.25, p.pitch + ry * 1.8 * sens * dt));
+    if (Math.abs(ry) > 0.2) p.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, p.pitch + ry * 1.8 * sens * dt));
     var bp = (pd.buttons[0] && pd.buttons[0].pressed) || (pd.buttons[7] && pd.buttons[7].pressed);
     var ub = pd.buttons[1] && pd.buttons[1].pressed;
     var mk = (pd.buttons[2] && pd.buttons[2].pressed) || (pd.buttons[3] && pd.buttons[3].pressed);
@@ -1173,6 +1240,9 @@ function placeCam(cam, p, dt) {
   var dz = Math.cos(p.yaw) * Math.cos(ep2);
   var dy = Math.sin(ep2);
   var target = camRayHit(p, dx, dy, dz, want);   // march the ACTUAL ray so we never clip
+  // occlusion flag for the silhouette ghost: something is cutting into this
+  // player's boom right now (pull-in active). Read by the render pass.
+  p.camOccluded = target < want - 0.05;
   if (p.camDist === undefined) p.camDist = target;
   if (target < p.camDist) p.camDist = target;                    // snap in when blocked
   else p.camDist += (target - p.camDist) * 0.12;                 // smooth the recovery back out
@@ -1235,7 +1305,7 @@ function spectate(p, pd, cam, dt) {
     var sens = camSpeeds[camSpeedIdx];
     var rx = pd.axes[2] || 0, ry = pd.axes[3] || 0;
     if (Math.abs(rx) > 0.2) p.yaw -= rx * 2.8 * sens * dt;
-    if (Math.abs(ry) > 0.2) p.pitch = Math.max(0.25, Math.min(1.25, p.pitch + ry * 1.8 * sens * dt));
+    if (Math.abs(ry) > 0.2) p.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, p.pitch + ry * 1.8 * sens * dt));
   }
   var idx = p.spec % targets.length;
   var t = targets[idx];
@@ -1296,8 +1366,11 @@ function animate() {
     var plus = pad.buttons[9] && pad.buttons[9].pressed;
     if (plus && !padStartPrev) {
       if (!running || gameOver) {
-        if (canStartGame()) startGame();
-        else if (!initialsActive && !resultsActive && !rulesOpen && !menuOpen) flashStartHint();
+        // resultsPending: inside endGame's 600ms window the modals aren't up
+        // yet, so canStartGame() alone would let Start eat the results screen
+        // (and a qualifying high score) — hold Start until the panel shows
+        if (canStartGame() && !resultsPending) startGame();
+        else if (!initialsActive && !resultsActive && !rulesOpen && !menuOpen && !resultsPending) flashStartHint();
       }
       else if (menuOpen) menuAction('resume', true);
       else openMenu();
@@ -1571,7 +1644,7 @@ function animate() {
               bot.hitCd = 0.6;
               snd(85, 0.35, 'sawtooth');
               if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;
-              if (bot.hp > 0 && bot.phase === 1 && bot.hp <= 500) enrageBoss(bot);   // phase 2 triggers ONCE at half health
+              if (bot.hp > 0 && bot.phase === 1 && bot.hp <= bot.hpMax / 2) enrageBoss(bot);   // phase 2 triggers ONCE at half health
               if (bot.hp <= 0) {
                 bot.alive = false;
                 scene.remove(bot.mesh);
@@ -1719,7 +1792,7 @@ function animate() {
     var bossAlive = null;
     bots.forEach(function (b) { if (b.boss && b.alive) bossAlive = b; });
     document.getElementById('bossbar').style.display = bossAlive ? 'block' : 'none';
-    if (bossAlive) document.getElementById('bossfill').style.width = Math.max(0, bossAlive.hp / 10) + '%';
+    if (bossAlive) document.getElementById('bossfill').style.width = Math.max(0, bossAlive.hp / bossAlive.hpMax * 100) + '%';
     var puNames = PU_NAME, puColors = PU_COLOR;
     if (twoPlayer) {
       document.getElementById('hudTL').innerHTML = twoPHudHtml('Player 1', '#64b5f6', player);
@@ -1778,26 +1851,43 @@ function animate() {
 
   updateCharacterAnim(dt);
 
+  // silhouette ghosts follow their characters (pose is static; position,
+  // facing, and scale track the real mesh)
+  humans().forEach(function (h) {
+    if (h.ghost && h.mesh) {
+      h.ghost.position.copy(h.mesh.position);
+      h.ghost.rotation.y = h.mesh.rotation.y;
+      h.ghost.scale.copy(h.mesh.scale);
+    }
+  });
+
   if (twoPlayer && player3 && running) {
     // 3 players: four quadrants — P1, P2, P3, and a bird's-eye view of the arena
     var qw = window.innerWidth / 2, qh = window.innerHeight / 2;
     renderer.setScissorTest(true);
+    showGhostFor(player);
     renderer.setScissor(0, qh, qw, qh);  renderer.setViewport(0, qh, qw, qh);  renderer.render(scene, camera);
+    showGhostFor(player2);
     renderer.setScissor(qw, qh, qw, qh); renderer.setViewport(qw, qh, qw, qh); renderer.render(scene, camera2);
+    showGhostFor(player3);
     renderer.setScissor(0, 0, qw, qh);   renderer.setViewport(0, 0, qw, qh);   renderer.render(scene, camera3);
+    showGhostFor(null);
     renderer.setScissor(qw, 0, qw, qh);  renderer.setViewport(qw, 0, qw, qh);  renderer.render(scene, cameraTop);
     renderer.setScissorTest(false);
   } else if (twoPlayer && player2 && running) {
     var hw = window.innerWidth / 2, hh = window.innerHeight;
     renderer.setScissorTest(true);
+    showGhostFor(player);
     renderer.setScissor(0, 0, hw, hh);
     renderer.setViewport(0, 0, hw, hh);
     renderer.render(scene, camera);
+    showGhostFor(player2);
     renderer.setScissor(hw, 0, hw, hh);
     renderer.setViewport(hw, 0, hw, hh);
     renderer.render(scene, camera2);
     renderer.setScissorTest(false);
   } else {
+    showGhostFor(!twoPlayer ? player : null);
     renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     renderer.render(scene, camera);
   }

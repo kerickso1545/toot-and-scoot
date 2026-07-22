@@ -19,6 +19,13 @@ var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wal
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 // ---- balance caps for passive upgrades (players AND rivals) ----
 var MAX_GAS = 4, MAX_BLAST = 5, MAX_SPEED = 7.0, SPEED_STEP = 0.5;
+// ---- camera pitch limits (Lego-style raised follow angle) ----
+// The floor is high enough that the 6.5-unit boom clears 2-unit walls in
+// almost every situation, so the camera rarely needs to lift or pull in.
+// (Research: Minecraft-style pull-in is the disliked model; Lego/TT games
+// hold a raised angle instead.) Lower PITCH_MIN = more dramatic but more
+// occlusion-prone.
+var PITCH_MIN = 0.6, PITCH_MAX = 1.25;
 // ---------- maze layouts: a different arena shape for every level ----------
 var MAZES = [
   { name: 'Classic',    shape: 'rect',     pillars: 'grid', crate: 0.72 },

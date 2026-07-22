@@ -222,7 +222,7 @@ function resultsAction(act) {
       return;
     }
     hideResults();
-    startGame();
+    startGame(true);   // retry continues from the level you died on
     try { renderer.domElement.requestPointerLock(); } catch (e) {}
   } else {
     // 'setup' and 'menu' both land on the title screen (it IS the setup screen)

@@ -78,9 +78,12 @@ hsub lines); game info never lives inside a player tile.
 
 ## Key systems and their functions
 
-- **Lifecycle**: `startGame()` → `startLevel(keepStats)` (rebuilds world +
+- **Lifecycle**: `startGame(retry)` → `startLevel(keepStats)` (rebuilds world +
   players; `carryStats()` persists score/wins/lives), `endGame(text)`,
   `menuAction('quit')`. Transitions between levels use `later()` timeouts.
+  `endGame` snapshots `retryLevel` (results "Retry" resumes there) and sets
+  `resultsPending` for 600ms — the pad Start path checks it so a Start press
+  can't race the results/initials panel and eat a high score.
 - **Safety rails**: `later(fn, ms)` + `bumpSession()` (session-ID-guarded
   timeouts, cleared on start/quit/end); `canStartGame()` (single gate for ALL
   start paths incl. pointerlockchange); `resetTransientUI()` (clears every
@@ -100,7 +103,7 @@ hsub lines); game info never lives inside a player tile.
 - **Theme**: `THEMES` (bathroom, sewer, construction, royal, bossArena) +
   `applyTheme()` — canvas-painted textures (crate shape/material via
   `crateGeoActive`/`crateMatActive`). `themeForLevel(level)` rotates themes
-  per level (L1 bathroom, every 10th bossArena; rotation in `THEME_ROTATION`).
+  per level (L1 bathroom, bossArena on isBossLevel levels; rotation in `THEME_ROTATION`).
   `startLevel` calls `applyTheme(themeForLevel(level))` BEFORE `buildWorld()`.
   CONTRACT: `applyTheme` MUTATES the shared materials (`matWall`,
   `matFloorA/B`, `matTempWall`, `matCrate`) in place — never replaces them —
@@ -154,15 +157,26 @@ hsub lines); game info never lives inside a player tile.
   `difficulty*2 + (level-1)`, capped.
 - **Boss** (every `BOSS_EVERY`=5 levels — `isBossLevel()` in constants.js is
   the ONE cadence source for maze/theme/spawn/messages): one bot with
-  `boss: true, hp: 1000`, 100 dmg
-  per blast hit (`hitCd` 0.6s i-frames). Phase 2 at ≤500 HP: `enrageBoss`
+  `boss: true`, `hp`/`hpMax` = 600/800/1000 by difficulty, 100 dmg
+  per blast hit (`hitCd` 0.6s i-frames; boss bar scales by `hpMax`).
+  Blind spot: `dangerMap(bot)` skips bombs behind his facing
+  (`bombBehindBoss`; own bombs exempt). Phase 2 at ≤`hpMax/2`: `enrageBoss`
   (tint, buffs) + `updateBossSpecial` (telegraphed cardinal-cross attack,
   1.2s warning planes, fires through the normal explosion system).
 - **Movement**: `controlHuman` (stick/WASD relative to camera yaw; sprint
   Shift/L3/LT ×1.6 drains stamina; beans/revive ×2; suppress-until-release
   after resume), `collides`/`overlappingSolids` (can always walk OUT of a
   solid you overlap — trap-wall unstick).
-- **Cameras**: `placeCam(cam, p, dt)` per human with grid-march collision
+- **Cameras**: Lego-style raised follow — pitch clamped to
+  `PITCH_MIN`/`PITCH_MAX` (0.6-1.25, constants.js) so the 6.5 boom clears
+  2-unit walls essentially always. Occlusion silhouette: `makeGhostFor(p)`
+  clones the character (userData swapped around clone — rigRefs are circular),
+  flat `MeshBasicMaterial` depthTest:false; `p.camOccluded` set in placeCam
+  when the boom is blocked; `showGhostFor(viewP)` toggles per viewport right
+  before each scissor render (own ghost only, never on bird's-eye/title);
+  ghosts follow position/rotation.y/scale each frame, removed+disposed in
+  startLevel via `removeGhost`. `placeCam(cam, p, dt)` per human with
+  grid-march collision
   (`camBlockedAt`, smooth `camDist` recovery, `camLift` ride-over-walls;
   on/beyond the arena's outer ring anything below `CAM_EDGE_CLEAR` (TS+0.8)
   counts as blocked, so the camera can never duck low behind an outside
@@ -201,9 +215,11 @@ hsub lines); game info never lives inside a player tile.
 `MAX_GAS=4, MAX_BLAST=5, MAX_SPEED=7.0, SPEED_STEP=0.5`; bomb fuse 2.2s,
 blast linger 0.45s; trap wall 10s; Turbo Toot blind 5s; mask 8s; beans 6s at
 normal speed, trail fuse 1.3s, trail bombs never chain-detonate (pop in drop
-order — `b.trail` checked at both chain sites); sprint ×1.6, stamina 100,
+order — `b.trail` checked at both chain sites; same-owner and hidden S.B.D.
+bombs never chain either); sprint ×1.6, stamina 100,
 drain 10/s, refill 20/s, exhaustion floor 30;
-beans 10% of drops, Extra Life 2%; boss special telegraph 1.2s, cooldown 7-9s.
+beans 10% of drops, Extra Life 2%; boss special telegraph 1.2s, cooldown 7-9s;
+boss HP 600/800/1000 by difficulty; camera PITCH_MIN 0.6 / PITCH_MAX 1.25.
 
 ## Known limitations
 

@@ -23,6 +23,14 @@ respect these unless Kevin explicitly changes them.
 - Third-person camera ("up and behind"), mouse/right-stick orbit. Aiming for
   directional abilities follows CAMERA yaw (changed from mesh facing —
   deliberate).
+- **Lego-style raised camera (2026-07-22)**: pitch floor raised 0.25 → 0.6
+  (`PITCH_MIN`) after research into Minecraft (pull-in, disliked) vs TT Lego
+  games (raised follow angle). At 0.6+ the 6.5-unit boom clears the 2-unit
+  walls essentially always (61k-case sim: zero pull-ins), so the camera stops
+  fighting the player. When something DOES briefly occlude, the player's own
+  viewport shows a see-through colored silhouette ("ghost") of their character
+  through the wall instead of zooming in. Kevin's call after the low-pan
+  annoyance; don't lower the floor without re-checking occlusion.
 - Everything controller-navigable (they cast to a TV). Menus: d-pad + A.
 
 ## Mechanics decisions (with rationale)
@@ -38,7 +46,9 @@ respect these unless Kevin explicitly changes them.
 - **Superpower on X: one use per level**, rotating Gas Mask → S.B.D. →
   Dutch Oven by level. (A 30s-cooldown version was tried and reverted.)
 - **Legendaries are indestructible floor items**: Can of Beans (10% of drops;
-  6s fart trail + double speed — you outrun your own farts) and rainbow
+  6s fart trail at NORMAL speed — Otto changed this from double speed
+  2026-07-21; the trail toots pop in drop order and never chain, so you can
+  outrun them) and rainbow
   **Extra Life** (2%; auto-revive with 2s invincible double-speed escape;
   carrier's avatar shimmers rainbow; fully automatic, no button).
 - **Turbo Toot** blind = PITCH BLACK screen for human victims (5s), random
@@ -53,11 +63,23 @@ respect these unless Kevin explicitly changes them.
   20/s, exhausted below 0 until 30 (can still walk). Plain movement is free.
 - **Six maze shapes** cycle by level: Classic, Octagon, Circle, Triangle,
   Diamond, Open floor — Otto wanted real shape variety, not just crate
-  reshuffles. Every 10th level is the boss arena.
-- **Boss (The Big Stinker)**: 1000 HP, 100/hit, crown, 2.2× scale, deepest
-  fart voice. Phase 2 at half health: enrage tint, faster, telegraphed
-  cardinal-cross stink attack (1.2s warning). Abilities must keep working on
-  him — never make him immune to player tools.
+  reshuffles. Every 5th level is the boss arena (changed from 10th,
+  2026-07-21).
+- **Boss (The Big Stinker)**: 600/800/1000 HP by difficulty (Easy/Med/Hard —
+  6/8/10 hits, scaled 2026-07-22 after the 10-hit fight proved too long),
+  100/hit, crown, 2.2× scale, deepest fart voice. Phase 2 at half health:
+  enrage tint, faster, telegraphed cardinal-cross stink attack (1.2s
+  warning). **Otto's sneak-attack rule (2026-07-21): he can't see farts
+  dropped behind his back** — his one exploitable weakness; keep it.
+  Abilities must keep working on him — never make him immune to player tools.
+- **Chain rules (2026-07-21/22)**: a blast never detonates a same-owner bomb
+  (Extra Gas double-toots keep their own fuses), never a bean-trail toot, and
+  never a hidden S.B.D. (the surprise stays secret until its own fuse).
+  Different-owner visible farts still chain — crossfire is intended.
+- **Retry continues (2026-07-22)**: the results panel's "Retry same setup"
+  resumes at the level you died on (fresh score/stats). Title-screen starts
+  always begin at level 1 (or the boss-mode pick). Rationale: losing 15
+  minutes of campaign to one blast was the top kid frustration.
 - **Difficulty**: Easy/Medium/Hard start tiers; tier = difficulty*2+(level-1)
   scales bot count/speed/range/aggression (capped). Bots collect passive
   upgrades too (parity decision, keeps late levels challenging).

@@ -242,7 +242,7 @@ var THEMES = {
     }
   },
 
-  // ---- Boss Arena: the haunted bathroom — dim porcelain, red accents (every 10th level) ----
+  // ---- Boss Arena: the haunted bathroom — dim porcelain, red accents (isBossLevel levels) ----
   bossArena: {
     sky: 0x2e2831,
     trapWall: { color: 0x84e8e0, opacity: 0.55 },   // icy frosted pane — NOT red/orange, so it
