@@ -86,9 +86,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")  # dev server: always revalidate
         http.server.SimpleHTTPRequestHandler.end_headers(self)
 
+    last_stamp = [None]  # shared across requests (class-level, list for mutability)
+
     def do_GET(self):
         if self.path == "/__version":
-            body = version_stamp().encode()
+            stamp = version_stamp()
+            if Handler.last_stamp[0] is not None and stamp != Handler.last_stamp[0]:
+                print("File change detected -> browser will reload " +
+                      "(waits for the title screen if a match is on)", flush=True)
+            Handler.last_stamp[0] = stamp
+            body = stamp.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(body)))
@@ -96,6 +103,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         if self.path.split("?")[0] == "/" + GAME:
+            print("Game loaded in browser  *pfft*", flush=True)
             try:
                 with open(os.path.join(HERE, GAME), "rb") as f:
                     body = f.read()
