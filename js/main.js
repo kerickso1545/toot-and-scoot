@@ -504,11 +504,23 @@ function spawnPowerup(x, z) {
 }
 
 // ---------- bot AI ----------
-function dangerMap() {
+function bombBehindBoss(bot, b) {
+  // SNEAK ATTACK rule: The Big Stinker can't see farts dropped BEHIND his
+  // back (rear half-circle from his facing). He always knows his own toots.
+  // This is the boss's one exploitable weakness — bait him into a chase,
+  // circle around, and toot behind him.
+  if (b.owner === bot) return false;
+  var fx = Math.sin(bot.mesh.rotation.y), fz = Math.cos(bot.mesh.rotation.y);
+  var c = tileCenter(b.gx, b.gz);
+  var dx = c.x - bot.mesh.position.x, dz = c.z - bot.mesh.position.z;
+  return fx * dx + fz * dz < 0;
+}
+function dangerMap(bot) {
   var danger = {};
   explosions.forEach(function (e) { danger[e.gx + ',' + e.gz] = true; });
   bombs.forEach(function (b) {
     if (b.hidden) return;   // rivals can't sense a Silent But Deadly
+    if (bot && bot.boss && bombBehindBoss(bot, b)) return;   // sneak attack!
     danger[b.gx + ',' + b.gz] = true;
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(function (d) {
       for (var r = 1; r <= b.range; r++) {
@@ -549,7 +561,7 @@ function botThink(bot, dt) {
     }
     return;
   }
-  var danger = dangerMap();
+  var danger = dangerMap(bot);
   var dirs = [[1,0],[-1,0],[0,1],[0,-1]];
   var here = bot.gx + ',' + bot.gz;
 

@@ -70,7 +70,8 @@ still works to set a start level directly without the picker.
   blinks, breathes when idle, scrunches down for a fart, and spins out when
   gassed (in multiplayer) — hats and colors as always
 - **Boss every 5th level**: The Big Stinker — 1000 HP, 100 damage per blast,
-  health bar, boss arena
+  health bar, boss arena. He dodges any fart he can see, but he **can't see
+  farts dropped behind his back** — bait him, circle around, sneak-toot
 - **Six rivals** with signature hats and synthesized fart voices; smarter,
   faster, and more numerous as levels climb — and they always spawn a safe
   distance from you (you spawn facing your escape route, never a wall)

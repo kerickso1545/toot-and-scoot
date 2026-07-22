@@ -139,6 +139,9 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   `aimDir(p)` from camera yaw; live previews via `updatePreviews` /
   `wallTargetInfo` / `turboLaneInfo`.
 - **Bot AI**: `botThink` — danger-map flee (BFS) first, then blind-wander,
+  `dangerMap(bot)` is per-bot: the boss can't sense bombs behind his back
+  (`bombBehindBoss` — rear half-circle from mesh facing, own bombs exempt;
+  hidden S.B.D. bombs invisible to all bots as before),
   passive-pickup seeking, bombing near crates/players, chase/wander;
   `levelParams` scales count/speed/range/aggression with
   `difficulty*2 + (level-1)`, capped.
