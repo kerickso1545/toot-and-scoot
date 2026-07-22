@@ -58,7 +58,9 @@ still works to set a start level directly without the picker.
   can outrun your own trail), rainbow **Extra Life** (2% — auto-revive with 2 s
   invincible double-speed escape; avatar shimmers rainbow while carried)
 - **Superpowers** (X, one per level, rotating): Gas Mask, Silent But Deadly,
-  Dutch Oven
+  Dutch Oven, Pyroflatulence (a fire-charged orange toot whose blast also
+  burns one tile sideways off both arms — the step-aside dodge doesn't work,
+  not even for you)
 - **Sprint + stamina**: 100 stamina, sprint drains 10/s, refills at rest;
   run dry and you can't sprint until it recovers
 - **Six maze shapes** cycle per level (Classic, Octagon, Circle, Triangle,

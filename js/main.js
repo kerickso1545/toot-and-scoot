@@ -495,6 +495,14 @@ function placeBomb(gx, gz, range, owner, opts) {
   var b = { gx: gx, gz: gz, timer: (opts && opts.fuse) || 2.2, range: range, owner: owner, mesh: m };
   if (opts && opts.hidden) { b.hidden = true; m.visible = false; }
   if (opts && opts.trail) b.trail = true;   // bean-trail toot: never chain-detonated
+  if (opts && opts.pyro) {
+    // fire-charged: unmistakably orange so alert rivals CAN read the danger
+    b.pyro = true;
+    m.material = new THREE.MeshLambertMaterial({
+      color: 0xff5722, emissive: 0xbf360c, emissiveIntensity: 0.55,
+      transparent: true, opacity: 0.9
+    });
+  }
   bombs.push(b);
   if (opts && opts.hidden) {}                              // silent but deadly makes no sound
   else if (opts && opts.quiet) snd(220, 0.08);             // bean-trail toots are little ones
@@ -505,8 +513,10 @@ function explode(b) {
   if (idx < 0) return;
   bombs.splice(idx, 1);
   scene.remove(b.mesh);
+  if (b.pyro && b.mesh.material && b.mesh.material.dispose) b.mesh.material.dispose();   // pyro toots own their material
   fart(ownerProfile(b.owner), true);
   snd(65, 0.5, 'sawtooth');
+  if (b.pyro) { snd(1400, 0.3, 'square'); snd(160, 0.5, 'sawtooth'); }   // fire crackle
   var tiles = [[b.gx, b.gz]];
   var drops = [];
   [[1,0],[-1,0],[0,1],[0,-1]].forEach(function (d) {
@@ -529,9 +539,41 @@ function explode(b) {
       }
     }
   });
-  fxExplosionAt(tiles, { boss: !!(b.owner && b.owner.boss) });
+  if (b.pyro) {
+    // PYROFLATULENCE ignition: the fire pushes ONE tile sideways off both
+    // arms of the cross — a fat flaming plus. Flanks stop at walls/traps,
+    // burn crates like the arms do, and follow the same chain rules.
+    // Rivals' danger sense only reads the normal cross (the flanks are the
+    // surprise — same precedent as S.B.D. being unsensable).
+    var seenT = {};
+    tiles.forEach(function (t) { seenT[t[0] + ',' + t[1]] = true; });
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+      var perps = d[0] === 0 ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]];
+      for (var r = 1; r <= b.range; r++) {
+        var ax = b.gx + d[0] * r, az = b.gz + d[1] * r;
+        if (!seenT[ax + ',' + az]) break;   // this arm stopped at a wall earlier
+        perps.forEach(function (pp) {
+          var px2 = ax + pp[0], pz2 = az + pp[1];
+          var k = px2 + ',' + pz2;
+          if (seenT[k]) return;
+          if (px2 < 0 || pz2 < 0 || px2 >= COLS || pz2 >= ROWS) return;
+          if (grid[pz2][px2] === 1 || grid[pz2][px2] === 3) return;
+          seenT[k] = true;
+          if (grid[pz2][px2] === 2) {
+            removeCrate(px2, pz2);
+            if (Math.random() < 0.35) drops.push([px2, pz2]);
+            if (b.owner && b.owner.score !== undefined) { b.owner.score += 10; b.owner.crates++; }
+          }
+          var fb = bombAt(px2, pz2);
+          if (fb && !fb.trail && !fb.hidden && fb.owner !== b.owner) explode(fb);
+          tiles.push([px2, pz2]);
+        });
+      }
+    });
+  }
+  fxExplosionAt(tiles, { boss: !!(b.owner && b.owner.boss), color: b.pyro ? 0xff7043 : undefined });
   tiles.forEach(function (t) {
-    var m = fxGroundGlow(t[0], t[1], b.owner && b.owner.boss);
+    var m = fxGroundGlow(t[0], t[1], (b.owner && b.owner.boss) || b.pyro);
     explosions.push({ gx: t[0], gz: t[1], timer: 0.45, mesh: m, owner: b.owner });
     for (var i = powerups.length - 1; i >= 0; i--) {
       if (powerups[i].gx === t[0] && powerups[i].gz === t[1] &&
@@ -801,9 +843,9 @@ function sprayAir(p) {
   return found;
 }
 
-var SUPERS = ['mask', 'sbd', 'dutch'];
-var SUPER_NAMES = { mask: 'Gas Mask', sbd: 'Silent But Deadly', dutch: 'Dutch Oven' };
-var SUPER_SHORT = { mask: 'MASK', sbd: 'S.B.D.', dutch: 'OVEN' };
+var SUPERS = ['mask', 'sbd', 'dutch', 'pyro'];
+var SUPER_NAMES = { mask: 'Gas Mask', sbd: 'Silent But Deadly', dutch: 'Dutch Oven', pyro: 'Pyroflatulence' };
+var SUPER_SHORT = { mask: 'MASK', sbd: 'S.B.D.', dutch: 'OVEN', pyro: 'PYRO' };
 
 function dutchOven(p) {
   var pt = tileOf(p);
@@ -875,6 +917,18 @@ function useSuperFor(p) {
     p.superUsed = true;
     p.itemsUsed++;
     snd(240, 0.3, 'sine');
+  } else if (t === 'pyro') {
+    // PYROFLATULENCE: drop a fire-charged toot. It clouds out like a normal
+    // fart, then IGNITES: the blast pushes one tile sideways off both arms
+    // of the cross — a fat flaming plus. The classic step-aside dodge does
+    // NOT work (not even for you — scoot two tiles or go diagonal-far!).
+    var pt3 = tileOf(p);
+    if (bombAt(pt3.x, pt3.z)) { showPMsg(p, 'Move off your toot first', 'super'); snd(110, 0.15, 'square'); return; }
+    p.superUsed = true;
+    p.itemsUsed++;
+    placeBomb(pt3.x, pt3.z, p.range, p, { pyro: true });
+    snd(320, 0.25, 'sawtooth');
+    snd(90, 0.35, 'sawtooth');
   }
 }
 // ---- The Big Stinker, phase 2: enraged at half health ----

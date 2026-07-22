@@ -143,6 +143,12 @@ hsub lines); game info never lives inside a player tile.
   with caps `MAX_GAS/MAX_BLAST/MAX_SPEED` (capped → left on floor + message).
   Actives fill the single `held` slot (full → left on floor). Pickup loop is
   in `animate()`; bots collect passives only (`botWantsPU`).
+- **Supers** rotate by level: mask → sbd → dutch → pyro (`SUPERS`).
+  Pyroflatulence: `placeBomb(..., {pyro:true})` (orange-tinted own material,
+  disposed at explode); in `explode()` the pyro block widens `tiles` with
+  one-tile perpendicular flanks off each arm (stop at walls/traps, burn
+  crates, same chain rules); fx use `color: 0xff7043` clouds + boss-style
+  ground glow; `dangerMap` intentionally marks only the normal cross.
 - **Abilities**: `usePowerupFor` (A): `placeWall`, `sprayAir`, `turboToot`
   (blind 5s: bots wander, humans get black screen). `useSuperFor` (X, one per
   level, rotates by level): mask / S.B.D. / `dutchOven`. Aiming uses

@@ -44,7 +44,14 @@ respect these unless Kevin explicitly changes them.
   MAX_SPEED 7.0). Super Scoot was briefly deleted as redundant with sprint,
   then restored as the third passive with caps.
 - **Superpower on X: one use per level**, rotating Gas Mask → S.B.D. →
-  Dutch Oven by level. (A 30s-cooldown version was tried and reverted.)
+  Dutch Oven → Pyroflatulence by level. (A 30s-cooldown version was tried
+  and reverted.)
+- **Pyroflatulence (Otto, 2026-07-22)**: fire-charged toot — normal fuse and
+  cloud, then ignites a FAT plus: the blast also burns one tile sideways off
+  both arms. Balance rails: once per level; the toot is unmistakably orange
+  so alert humans can read it; rivals' danger sense only reads the normal
+  cross (flanks are the surprise, same precedent as S.B.D.); the step-aside
+  dodge fails for the OWNER too — real self-gas risk is the counterweight.
 - **Legendaries are indestructible floor items**: Can of Beans (10% of drops;
   6s fart trail at NORMAL speed — Otto changed this from double speed
   2026-07-21; the trail toots pop in drop order and never chain, so you can
