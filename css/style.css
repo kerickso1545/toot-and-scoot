@@ -133,3 +133,8 @@
     text-shadow: 6px 6px 0 rgba(0,0,0,0.8);
   }
   .cdnum.scoot { font-size: 58px; color: #aeea00; letter-spacing: 2px; }
+  .rtable { margin: 8px auto 14px; border-collapse: collapse; font-size: 17px; }
+  .rtable th { padding: 3px 12px; font-size: 18px; text-shadow: 1px 1px 0 #000; }
+  .rtable td { padding: 3px 12px; color: #fff; }
+  .rtable td.rlabel { text-align: left; color: #b3e5fc; }
+  .rtable td.rval { text-align: center; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; }

@@ -66,6 +66,15 @@
   <p><b>Multiplayer:</b> split screen battle royale with the rivals mixed in. Knocked out? You spectate (A switches who you watch). When someone wins the round, EVERYONE moves on to the next level together, and the win counter keeps the family rivalry honest.</p>
   <button class="mbtn" onclick="hideRules()" style="margin:10px auto 0">Back</button>
 </div>
+<div id="resultspanel" class="menu" style="display:none; max-height:86vh; overflow-y:auto">
+  <h2>The results are in!</h2>
+  <div id="resultsSub" style="color:#ffd54f; font-size:18px; margin-bottom:4px"></div>
+  <div id="resultsBody"></div>
+  <button class="mbtn" data-ract="retry" onclick="resultsAction('retry')">Retry same setup</button>
+  <button class="mbtn" data-ract="setup" onclick="resultsAction('setup')">Change setup</button>
+  <button class="mbtn" data-ract="menu" onclick="resultsAction('menu')">Main menu</button>
+  <p style="font-size:14px; color:#90a4ae; margin:8px 0 0">d-pad or arrows move &middot; A or Enter picks</p>
+</div>
 <div id="initials" class="menu" style="display:none">
   <h2>New high score!</h2>
   <div id="initScore" style="font-size:19px; margin-bottom:10px; color:#ffd54f"></div>

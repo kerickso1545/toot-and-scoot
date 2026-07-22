@@ -49,6 +49,9 @@ var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p =
 // level-start countdown ("3, 2, 1, SCOOT!!") — dt-driven in animate(), NOT a
 // timeout, so pausing freezes it and quitting cleans it up like everything else
 var countdownT = 0, countdownPhase = -1;
+// in-level clock for the "Fastest level" stat: accumulates dt only while the
+// simulation actually runs (pause and the countdown freeze don't count)
+var levelTime = 0;
 // ---- game session + tracked delayed transitions ----
 // EVERY delayed callback that mutates game state goes through later(); bumpSession()
 // (called from startGame / quit / endGame) both clears the pending timeouts AND
@@ -91,9 +94,14 @@ function nearestPlayerTile(gx, gz) {
 }
 
 function carryStats(prevPlayer) {
-  // the ONE rule for what persists between levels — used identically for P1, P2, P3
-  if (!prevPlayer) return { score: 0, wins: 0, lives: 0 };
-  return { score: prevPlayer.score || 0, wins: prevPlayer.wins || 0, lives: prevPlayer.lives || 0 };
+  // the ONE rule for what persists between levels — used identically for P1, P2, P3.
+  // campaign stats (kills/crates/selfGas/itemsUsed/bestT) ride along for the
+  // end-of-game results screen; they reset with everything else at startGame.
+  if (!prevPlayer) return { score: 0, wins: 0, lives: 0, kills: 0, crates: 0, selfGas: 0, itemsUsed: 0, bestT: null };
+  return { score: prevPlayer.score || 0, wins: prevPlayer.wins || 0, lives: prevPlayer.lives || 0,
+           kills: prevPlayer.kills || 0, crates: prevPlayer.crates || 0, selfGas: prevPlayer.selfGas || 0,
+           itemsUsed: prevPlayer.itemsUsed || 0,
+           bestT: prevPlayer.bestT === undefined ? null : prevPlayer.bestT };
 }
 
 function startLevel(keepStats) {
@@ -143,6 +151,7 @@ function startLevel(keepStats) {
     score:    cs1.score,
     wins:     cs1.wins,
     lives:    cs1.lives,
+    kills: cs1.kills, crates: cs1.crates, selfGas: cs1.selfGas, itemsUsed: cs1.itemsUsed, bestT: cs1.bestT,
     stamina:  100,
     maskTime: 0,
     suppress: true,
@@ -158,6 +167,7 @@ function startLevel(keepStats) {
       mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
       yaw: 0.6, pitch: 0.55,
       speed: 5, maxBombs: 1, range: 2, held: null, wins: cs2.wins, lives: cs2.lives, score: cs2.score, stamina: 100,
+      kills: cs2.kills, crates: cs2.crates, selfGas: cs2.selfGas, itemsUsed: cs2.itemsUsed, bestT: cs2.bestT,
       maskTime: 0, suppress: true, superType: superType, superUsed: false
     };
     player2.mesh.position.set(c2.x, 0, c2.z);
@@ -171,6 +181,7 @@ function startLevel(keepStats) {
         mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
         yaw: 2.5, pitch: 0.55,
         speed: 5, maxBombs: 1, range: 2, held: null, wins: cs3.wins, lives: cs3.lives, score: cs3.score, stamina: 100,
+        kills: cs3.kills, crates: cs3.crates, selfGas: cs3.selfGas, itemsUsed: cs3.itemsUsed, bestT: cs3.bestT,
         maskTime: 0, suppress: true, superType: superType, superUsed: false
       };
       player3.mesh.position.set(c3.x, 0, c3.z);
@@ -227,6 +238,7 @@ function startLevel(keepStats) {
   }
   running = true; gameOver = false;
   overlay.style.display = 'none';
+  levelTime = 0;
   startCountdown();
 }
 
@@ -321,6 +333,7 @@ function resetTransientUI() {
   // hide/clear every transient overlay, timer, and helper mesh.
   // safe to call any time: quit, endGame, and every startLevel go through here.
   endCountdown();
+  hideResults();
   maskoverlay.style.display = 'none';
   maskoverlay.style.opacity = '1';
   for (var i = 0; i < 3; i++) {
@@ -398,7 +411,7 @@ function explode(b) {
       if (grid[z][x] === 2) {
         removeCrate(x, z);
         if (Math.random() < 0.35) drops.push([x, z]);
-        if (b.owner && b.owner.score !== undefined) b.owner.score += 10;   // 10 points per roll destroyed
+        if (b.owner && b.owner.score !== undefined) { b.owner.score += 10; b.owner.crates++; }   // 10 points per roll destroyed
         // blast punches straight through crates — same length every direction
       }
     }
@@ -718,6 +731,7 @@ function useSuperFor(p) {
   var t = p.superType;
   if (t === 'mask') {
     p.superUsed = true;
+    p.itemsUsed++;
     p.maskTime = 8;
     if (!twoPlayer) {
       maskoverlay.style.display = 'block';
@@ -729,10 +743,12 @@ function useSuperFor(p) {
     var pt = tileOf(p);
     if (bombAt(pt.x, pt.z)) { snd(110, 0.15, 'square'); return; }
     p.superUsed = true;
+    p.itemsUsed++;
     placeBomb(pt.x, pt.z, p.range + 1, p, { hidden: true });
   } else if (t === 'dutch') {
     if (!dutchOven(p)) { snd(110, 0.15, 'square'); return; }   // no rival in range — keep it
     p.superUsed = true;
+    p.itemsUsed++;
     snd(240, 0.3, 'sine');
   }
 }
@@ -863,6 +879,7 @@ function usePowerupFor(p) {
   }
   else if (p.held === 'bomb') p.maxBombs = Math.min(MAX_GAS, p.maxBombs + 1);
   else if (p.held === 'range') p.range = Math.min(MAX_BLAST, p.range + 1);
+  p.itemsUsed++;   // results-screen stat: only SUCCESSFUL uses reach this line
   p.held = null;
   clearPreview(p);
   snd(880, 0.18, 'sine');
@@ -895,7 +912,7 @@ document.addEventListener('pointerlockchange', function () {
   } else {
     if (running && !gameOver) {
       openMenu();
-    } else if (!initialsActive) {
+    } else if (!initialsActive && !resultsActive) {
       overlay.style.display = 'flex';
       diffbtns.style.display = 'block';
       renderTitleFocus();
@@ -921,6 +938,13 @@ document.addEventListener('keydown', function (e) {
     else if (e.code === 'ArrowRight') advanceSlot();
     else if (e.code === 'Enter') { if (initSlot === 2) finishInitials(); else advanceSlot(); }
     else if (e.code === 'Backspace') { if (initSlot > 0) initSlot--; renderInitials(); }
+    return;
+  }
+  if (resultsActive) {
+    var rb = resultsButtons();
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') { resultsIndex = (resultsIndex + rb.length - 1) % rb.length; renderResultsFocus(); }
+    else if (e.code === 'ArrowDown' || e.code === 'KeyS') { resultsIndex = (resultsIndex + 1) % rb.length; renderResultsFocus(); }
+    else if (e.code === 'Enter' || e.code === 'KeyE') resultsAction(rb[resultsIndex].dataset.ract);
     return;
   }
   if (rulesOpen) {
@@ -960,17 +984,18 @@ function endGame(text) {
   bumpSession();               // cancels pending transitions; new session for our own delay below
   closeMenus();
   padDiscMsg = '';
-  resetTransientUI();
+  resetTransientUI();          // hides any stale results panel BEFORE the new snapshot below
   hudroot.style.display = 'none';
   bigmsg.textContent = text;
+  pendingResults = buildResults();   // snapshot stats before anything rebuilds the players
   later(function () {          // session-guarded: a quit or new game cancels this too
     if (document.pointerLockElement) document.exitPointerLock();
+    // 1P with a qualifying score: initials FIRST (banks the score), then the
+    // results panel (via finishInitials). Everyone else: straight to results.
     if (!twoPlayer && player && player.score > 0 && scoreQualifies(player.score)) {
       showInitials({ score: player.score, level: level });
     } else {
-      overlay.style.display = 'flex';
-      diffbtns.style.display = 'block';
-      renderTitleFocus();
+      showResults();
     }
     updatePadStatus();
   }, 600);
@@ -1203,7 +1228,7 @@ function animate() {
     if (plus && !padStartPrev) {
       if (!running || gameOver) {
         if (canStartGame()) startGame();
-        else if (!initialsActive && !rulesOpen && !menuOpen) flashStartHint();
+        else if (!initialsActive && !resultsActive && !rulesOpen && !menuOpen) flashStartHint();
       }
       else if (menuOpen) menuAction('resume', true);
       else openMenu();
@@ -1221,6 +1246,11 @@ function animate() {
       if (ltNow && !padLtPrev) { if (initSlot > 0) initSlot--; renderInitials(); }
       if (rtNow && !padRtPrev) advanceSlot();
       if (aNow && !padAPrev) advanceSlot();
+    } else if (resultsActive) {
+      var rbtns = resultsButtons();
+      if (upNow && !padUpPrev) { resultsIndex = (resultsIndex + rbtns.length - 1) % rbtns.length; renderResultsFocus(); }
+      if (dnNow && !padDnPrev) { resultsIndex = (resultsIndex + 1) % rbtns.length; renderResultsFocus(); }
+      if (aNow && !padAPrev) resultsAction(rbtns[resultsIndex].dataset.ract);
     } else if (menuOpen) {
       var mbtns = menuButtons();
       if (upNow && !padUpPrev) { menuIndex = (menuIndex + mbtns.length - 1) % mbtns.length; renderMenu(); }
@@ -1273,6 +1303,7 @@ function animate() {
     updateFX(dt);
 
     if (!frozen) { // ---- SIMULATION: fully frozen during the level-start countdown ----
+      levelTime += dt;   // "Fastest level" clock (pause + countdown excluded)
       // bombs
       bombs.slice().forEach(function (b) {
         b.timer -= dt;
@@ -1477,7 +1508,7 @@ function animate() {
                 scene.remove(bot.mesh);
                 clearBossWarnings();
                 snd(60, 0.8, 'sawtooth'); snd(40, 1.0, 'triangle');
-                if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 1000;   // boss bonus!
+                if (hitE.owner && hitE.owner.score !== undefined) { hitE.owner.score += 1000; hitE.owner.kills++; }   // boss bonus!
               }
             }
           } else {
@@ -1485,7 +1516,7 @@ function animate() {
             charSpin(bot);   // knockout spin-out; removal delayed past the 0.6s animation
             (function (deadBot) { later(function () { scene.remove(deadBot.mesh); }, 650); })(bot);
             snd(120, 0.5, 'triangle');
-            if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;   // 100 points per rival YOU gassed
+            if (hitE.owner && hitE.owner.score !== undefined) { hitE.owner.score += 100; hitE.owner.kills++; }   // 100 points per rival YOU gassed
           }
         }
       });
@@ -1508,6 +1539,7 @@ function animate() {
             return;
           }
           p.alive = false;
+          if (hitBy.owner === p) p.selfGas++;   // oops! gassed yourself
           if (twoPlayer) {
             // multiplayer only: knockout spin-out, removal delayed past the animation.
             // In 1P, death calls endGame (running=false + bumpSession) so no spin
@@ -1536,6 +1568,7 @@ function animate() {
           var winner = aliveH[0];
           winner.wins = (winner.wins || 0) + 1;
           winner.score = (winner.score || 0) + 500;   // 500 point round-win bonus
+          if (winner.bestT === null || winner.bestT === undefined || levelTime < winner.bestT) winner.bestT = levelTime;
           var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
           showLevelMsg(wname + ' wins the round!');
           snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
@@ -1554,6 +1587,7 @@ function animate() {
         if (player.alive && !transitioning && bots.length && bots.every(function (b) { return !b.alive; })) {
           transitioning = true;
           player.score += 500;   // 500 point bonus for winning the level
+          if (player.bestT === null || player.bestT === undefined || levelTime < player.bestT) player.bestT = levelTime;
           showLevelMsg('Level ' + level + ' cleared! +500');
           snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
           later(function () {             // session-guarded AND cleared on quit/endGame/startGame

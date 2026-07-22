@@ -107,9 +107,117 @@ function finishInitials() {
   sc.sort(function (a, b) { return b.score - a.score; });
   try { localStorage.setItem('tootScootScores', JSON.stringify(sc.slice(0, 10))); } catch (e) {}
   renderScoreboard();
+  // initials first, results second: the score is banked before the results
+  // panel offers a retry, so a qualifying score can never be lost
+  if (pendingResults) { showResults(); return; }
   overlay.style.display = 'flex';
   diffbtns.style.display = 'block';
   renderTitleFocus();
+}
+
+// ---- end-of-game results panel (1P game over / multiplayer total wipe) ----
+var resultsActive = false, resultsIndex = 0, pendingResults = null;
+var resultspanelEl = document.getElementById('resultspanel');
+function fmtLevelTime(t) {
+  if (t === null || t === undefined) return '-';
+  var m = Math.floor(t / 60);
+  var s = t - m * 60;
+  return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+}
+function buildResults() {
+  // snapshot at endGame time — player objects get rebuilt on the next start
+  var cols = ['#64b5f6', '#81c784', '#ea80fc'];
+  return {
+    level: level,
+    mp: twoPlayer,
+    players: humans().map(function (p, i) {
+      return {
+        name: twoPlayer ? 'Player ' + (i + 1) : 'You',
+        color: cols[i],
+        score: p.score || 0, wins: p.wins || 0,
+        kills: p.kills || 0, crates: p.crates || 0,
+        selfGas: p.selfGas || 0, itemsUsed: p.itemsUsed || 0,
+        bestT: p.bestT === undefined ? null : p.bestT
+      };
+    })
+  };
+}
+function resultsHtml(r) {
+  var rows = [
+    ['Score', function (p) { return p.score; }],
+    ['Rounds won', function (p) { return p.wins; }, true],   // multiplayer only
+    ['Rivals gassed', function (p) { return p.kills; }],
+    ['TP shredded', function (p) { return p.crates; }],
+    ['Oops! Gassed yourself', function (p) { return p.selfGas; }],
+    ['Items used', function (p) { return p.itemsUsed; }],
+    ['Fastest level', function (p) { return fmtLevelTime(p.bestT); }]
+  ];
+  var html = '<table class="rtable">';
+  if (r.mp) {
+    html += '<tr><td></td>';
+    r.players.forEach(function (p) { html += '<th style="color:' + p.color + '">' + p.name + '</th>'; });
+    html += '</tr>';
+  }
+  rows.forEach(function (row) {
+    if (row[2] && !r.mp) return;
+    html += '<tr><td class="rlabel">' + row[0] + '</td>';
+    r.players.forEach(function (p) { html += '<td class="rval">' + row[1](p) + '</td>'; });
+    html += '</tr>';
+  });
+  return html + '</table>';
+}
+function resultsButtons() {
+  return Array.prototype.slice.call(resultspanelEl.querySelectorAll('.mbtn'));
+}
+function renderResultsFocus() {
+  resultsButtons().forEach(function (b, i) { b.className = 'mbtn' + (i === resultsIndex ? ' sel' : ''); });
+}
+function showResults() {
+  var r = pendingResults;
+  if (!r) {   // nothing pending: fall back to the title screen
+    overlay.style.display = 'flex';
+    diffbtns.style.display = 'block';
+    renderTitleFocus();
+    return;
+  }
+  resultsActive = true;
+  resultsIndex = 0;
+  var sub = document.getElementById('resultsSub');
+  sub.textContent = (r.mp ? 'The rivals got everyone on level ' : 'You made it to level ') + r.level + '!';
+  sub.style.color = '#ffd54f';
+  document.getElementById('resultsBody').innerHTML = resultsHtml(r);
+  resultspanelEl.style.display = 'block';
+  renderResultsFocus();
+}
+function hideResults() {
+  resultsActive = false;
+  pendingResults = null;
+  resultspanelEl.style.display = 'none';
+}
+function resultsAction(act) {
+  if (act === 'retry') {
+    // same players/difficulty/color/hat are still selected in the globals, so
+    // a retry is just startGame() — but ONLY through the one true gate
+    resultsActive = false;                 // canStartGame must see the panel as closing
+    if (!canStartGame()) {
+      resultsActive = true;                // blocked (controller missing) — stay here
+      var sub = document.getElementById('resultsSub');
+      sub.textContent = 'Connect your controllers to retry!';
+      sub.style.color = '#ff8a65';
+      snd(140, 0.2, 'square');
+      return;
+    }
+    hideResults();
+    startGame();
+    try { renderer.domElement.requestPointerLock(); } catch (e) {}
+  } else {
+    // 'setup' and 'menu' both land on the title screen (it IS the setup screen)
+    hideResults();
+    overlay.style.display = 'flex';
+    diffbtns.style.display = 'block';
+    renderTitleFocus();
+    updatePadStatus();
+  }
 }
 
 function pickHat(t, el, ev) {
@@ -221,7 +329,7 @@ function flashStartHint() {
 }
 // the ONE gate every start path must pass through
 function canStartGame() {
-  return (!running || gameOver) && !initialsActive && !rulesOpen && !menuOpen && controllersReady();
+  return (!running || gameOver) && !initialsActive && !resultsActive && !rulesOpen && !menuOpen && controllersReady();
 }
 
 function pickDiff(d, ev) {
