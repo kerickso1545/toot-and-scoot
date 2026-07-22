@@ -23,13 +23,35 @@ function pillarAt(kind, x, z) {
   }
   return false;
 }
-function findSpawn(tx, tz, used, minDist) {
+function spawnEscape(x, z) {
+  // A spawn must let you survive your own first toot: some neighbor N (not a
+  // permanent wall) from which you can then step SIDEWAYS out of the blast
+  // line — N's perpendicular neighbor also not a permanent wall. Crates don't
+  // count as blockers here because buildWorld carves the chosen route clear
+  // of crates. Returns the route [[nx,nz],[px,pz]] or null.
+  var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (var i = 0; i < dirs.length; i++) {
+    var nx = x + dirs[i][0], nz = z + dirs[i][1];
+    if (nx < 1 || nz < 1 || nx > COLS - 2 || nz > ROWS - 2 || grid[nz][nx] === 1) continue;
+    var perps = dirs[i][0] === 0 ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]];
+    for (var j = 0; j < perps.length; j++) {
+      var px = nx + perps[j][0], pz = nz + perps[j][1];
+      if (px >= 1 && pz >= 1 && px <= COLS - 2 && pz <= ROWS - 2 && grid[pz][px] !== 1)
+        return [[nx, nz], [px, pz]];
+    }
+  }
+  return null;
+}
+function findSpawn(tx, tz, used, minDist, skipEscapeCheck) {
   // scans EVERY open tile; minDist is the required spacing from already-used
-  // spawns and can be relaxed (down to 0) when the maze is tight
+  // spawns and can be relaxed (down to 0) when the maze is tight.
+  // Tiles without a survivable bomb-escape route (spawnEscape) are rejected
+  // unless skipEscapeCheck is set (absolute last resort).
   var best = null, bd = 1e9;
   for (var z = 1; z < ROWS - 1; z++) {
     for (var x = 1; x < COLS - 1; x++) {
       if (grid[z][x] === 1 || used[x + ',' + z]) continue;
+      if (!skipEscapeCheck && !spawnEscape(x, z)) continue;
       var tooClose = false;
       for (var k in used) {
         var p = k.split(',');
@@ -113,11 +135,28 @@ function buildWorld() {
       }
     }
   }
-  // clear a safe pocket around every final spawn
+  // absolute last resort: if the escape-route requirement left us short of
+  // spawns (shouldn't happen on any current maze), take escape-less tiles
+  // rather than spawning nobody
+  for (var sp2 = 0; sp2 < spacingPasses.length && levelSpawns.length < spawnsNeeded; sp2++) {
+    for (var st2 = 0; st2 < spawnTargets.length && levelSpawns.length < spawnsNeeded; st2++) {
+      var s2 = findSpawn(spawnTargets[st2][0], spawnTargets[st2][1], used, spacingPasses[sp2], true);
+      if (s2 && !used[s2[0] + ',' + s2[1]]) {
+        used[s2[0] + ',' + s2[1]] = true;
+        levelSpawns.push(s2);
+      }
+    }
+  }
+  // clear a safe pocket around every final spawn, and carve the crates off
+  // the bomb-escape route so the first toot is always survivable
   levelSpawns.forEach(function (s) {
     [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(function (d) {
       var x = s[0] + d[0], z = s[1] + d[1];
       if (grid[z] && grid[z][x] === 2) grid[z][x] = 0;
+    });
+    var esc = spawnEscape(s[0], s[1]);
+    if (esc) esc.forEach(function (t) {
+      if (grid[t[1]] && grid[t[1]][t[0]] === 2) grid[t[1]][t[0]] = 0;
     });
   });
 

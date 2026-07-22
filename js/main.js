@@ -984,12 +984,12 @@ function placeCam(cam, p, dt) {
     if (t >= comfy || ep >= maxPitch) { need = ep - p.pitch; break; }
   }
   if (p.camLift === undefined) p.camLift = 0;
-  // dt-based smoothing (frame-rate independent). Lift engages fast enough to
-  // stop the mega-zoom, but releases SLOWLY: walking past a row of pillars
-  // holds one steady raised angle instead of bouncing once per pillar.
-  var liftUp = 1 - Math.pow(0.002, dt || 0.016);   // ~90% engaged in ~0.37s
-  var liftDown = 1 - Math.pow(0.15, dt || 0.016);  // ~90% released in ~1.2s
-  p.camLift += (need - p.camLift) * (need > p.camLift ? liftUp : liftDown);
+  // Rise INSTANTLY to the needed lift: the camera simply refuses to drop into
+  // the blocked zone, acting as a hard floor on the view angle near walls —
+  // no zoomed-to-face frames, ever. Settle back SLOWLY so pillar rows and
+  // wall grazes don't pump the camera up and down while walking.
+  if (need >= p.camLift) p.camLift = need;
+  else p.camLift += (need - p.camLift) * (1 - Math.pow(0.15, dt || 0.016)); // ~90% released in ~1.2s
   var ep2 = Math.min(p.pitch + Math.max(0, p.camLift), maxPitch);
   var dx = Math.sin(p.yaw) * Math.cos(ep2);
   var dz = Math.cos(p.yaw) * Math.cos(ep2);
