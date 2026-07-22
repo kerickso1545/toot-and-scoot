@@ -81,10 +81,15 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   timeouts, cleared on start/quit/end); `canStartGame()` (single gate for ALL
   start paths incl. pointerlockchange); `resetTransientUI()` (clears every
   overlay/banner/preview/effect).
-- **Maze**: `MAZES` (6 shapes cycling by level; boss arena every 10th),
-  `insideShape`, `pillarAt`, `buildWorld()` (gen + flood-fill connectivity
-  guarantee — isolated pockets get sealed; spawn generation with progressive
-  distance relaxation), `findSpawn`. Floor tiles + permanent walls render as
+- **Maze**: `MAZES` (6 shapes cycling by level; boss arena on `isBossLevel`
+  levels), `insideShape`, `pillarAt`, `buildWorld()` (gen + flood-fill
+  connectivity guarantee — isolated pockets get sealed). Spawn selection is
+  TWO-PHASE: humans first (escape route via `spawnEscape` non-negotiable,
+  spacing 4 relaxing to 0), then bots with a keep-away gap from every human
+  spawn (5 relaxing to 2; escape-less tiles only as the dead-last bot
+  fallback). `findSpawn(tx, tz, used, minDist, skipEscapeCheck, avoid,
+  avoidDist)` scans every open tile. `spawnFacing` (main.js) orients each
+  player's yaw + body toward their escape route at spawn. Floor tiles + permanent walls render as
   3 `InstancedMesh` (render-only — `grid[z][x]` stays the collision/AI truth;
   ~277-300 static draw calls → 3 per view). Crates and trap walls stay
   individual meshes.
@@ -137,7 +142,9 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   passive-pickup seeking, bombing near crates/players, chase/wander;
   `levelParams` scales count/speed/range/aggression with
   `difficulty*2 + (level-1)`, capped.
-- **Boss** (every 10th level): one bot with `boss: true, hp: 1000`, 100 dmg
+- **Boss** (every `BOSS_EVERY`=5 levels — `isBossLevel()` in constants.js is
+  the ONE cadence source for maze/theme/spawn/messages): one bot with
+  `boss: true, hp: 1000`, 100 dmg
   per blast hit (`hitCd` 0.6s i-frames). Phase 2 at ≤500 HP: `enrageBoss`
   (tint, buffs) + `updateBossSpecial` (telegraphed cardinal-cross attack,
   1.2s warning planes, fires through the normal explosion system).
@@ -146,7 +153,11 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
   after resume), `collides`/`overlappingSolids` (can always walk OUT of a
   solid you overlap — trap-wall unstick).
 - **Cameras**: `placeCam(cam, p, dt)` per human with grid-march collision
-  (`camBlockedAt`, smooth `camDist` recovery, `camLift` ride-over-walls);
+  (`camBlockedAt`, smooth `camDist` recovery, `camLift` ride-over-walls;
+  on/beyond the arena's outer ring anything below `CAM_EDGE_CLEAR` (TS+0.8)
+  counts as blocked, so the camera can never duck low behind an outside
+  wall — clearance sized to stay reachable within maxPitch when hugging the
+  wall);
   the RESOLVED point is then position-smoothed (`p.camPos`, ~0.11s half-life)
   with a re-marched safety clamp so the eye can never sit inside a wall;
   sprint FOV kick +5° (`FOV_BASE`/`FOV_SPRINT_KICK`, reads `p.sprinting` set
@@ -161,7 +172,12 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
 - **Audio**: all Web Audio synthesis. `FARTS` per-character profiles →
   `fart(profile, big)`; `snd()` for UI beeps.
 - **Leaderboard**: localStorage key `tootScootScores`, top 10, 1P only,
-  initials entry UI (`initialsActive` state machine).
+  initials entry UI (`initialsActive` state machine). Entries store
+  `{initials, score, level, diff, mode}` — difficulty/mode snapshotted in
+  `showInitials`; scoreboard rows render the difficulty tag.
+- **Boss mode / start level**: `startAtLevel` parsed from `?level=N`
+  (clamped 1-99) at load; `startGame` starts every game there. Set via
+  `play.py --level N`.
 - **Scoring**: 10 crate / 100 rival / 200 player KO / 500 level-or-round win /
   boss 100 per hit + 1000 kill. Credited to `explosion.owner.score` when the
   owner is a human (bots have no `score` field — guarded by

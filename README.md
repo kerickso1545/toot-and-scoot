@@ -15,9 +15,14 @@ works, but the high-score leaderboard is saved separately per method — stick
 with `play.py`. Best played with Bluetooth/USB controllers; keyboard + mouse
 also fully supported.
 
+**Boss mode**: `python play.py --level 5` starts every new game at that level
+— bosses are every 5th level, so `--level 5`, `10`, `15`... jumps straight to
+the fight (higher levels are harder, just like getting there the long way).
+
 ### Modes
 - **1 player** — level campaign with rising difficulty, scoring, and a
-  persistent local leaderboard (top 10, classic 3-initial entry)
+  persistent local leaderboard (top 10, classic 3-initial entry; every entry
+  shows the difficulty it was earned on)
 - **2 player split screen** and **3 player quadrant view** (third-person
   cameras; the 3P fourth quadrant is a live bird's-eye view) — battle royale
   with rival bots mixed in; when someone wins the round, everyone advances to
@@ -58,15 +63,23 @@ also fully supported.
 - **Per-level themes** rotate as you climb: Bathroom (level 1) → Sewer
   Kingdom (mossy stone + glowing slime) → Construction Site (caution stripes
   + porta-potty crates) → Royal Throne Room (marble, gold, red carpet) →
-  repeat — and every 10th level the boss fight happens in a dark, red-lit
+  repeat — and every 5th level the boss fight happens in a dark, red-lit
   haunted-bathroom Boss Arena
 - **Animated characters**: everyone waddles as they run, leans into turns,
   blinks, breathes when idle, scrunches down for a fart, and spins out when
   gassed (in multiplayer) — hats and colors as always
-- **Boss every 10th level**: The Big Stinker — 1000 HP, 100 damage per blast,
+- **Boss every 5th level**: The Big Stinker — 1000 HP, 100 damage per blast,
   health bar, boss arena
 - **Six rivals** with signature hats and synthesized fart voices; smarter,
-  faster, and more numerous as levels climb
+  faster, and more numerous as levels climb — and they always spawn a safe
+  distance from you (you spawn facing your escape route, never a wall)
+- **"3, 2, 1, SCOOT!!" countdown** at every level start: everyone's frozen
+  while big numbers count down in each player's viewport, with a P1/P2/P3
+  badge floating over each player's head so nobody loses themselves after a
+  split-screen level change
+- **Results screen** after every run: score, level reached, rivals gassed,
+  TP shredded, self-gasses, items used, and fastest level — with Retry same
+  setup / Change setup / Main menu
 - **Scoring**: 10 per crate, 100 per rival, 200 per player KO, 500 per
   level/round win, boss hits 100 each + 1000 bonus
 - HUD: kart-racer style panels, item boxes with button labels, minimap
