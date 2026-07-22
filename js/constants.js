@@ -1,4 +1,9 @@
 var COLS = 15, ROWS = 13, TS = 2;           // tile size in world units
+// The Big Stinker shows up every BOSS_EVERY levels (5, 10, 15, ...).
+// THE one place the boss cadence lives — maze, theme, spawn, and level
+// messages all ask isBossLevel().
+var BOSS_EVERY = 5;
+function isBossLevel(l) { return l % BOSS_EVERY === 0; }
 var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 // ---- balance caps for passive upgrades (players AND rivals) ----

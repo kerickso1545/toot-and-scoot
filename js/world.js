@@ -81,7 +81,7 @@ function buildWorld() {
   worldMeshes.forEach(function (m) { if (m.isInstancedMesh) m.dispose(); });
   clearGroup(worldMeshes); worldMeshes = [];
   crateMeshes = {};
-  currentMaze = (level % 10 === 0)
+  currentMaze = isBossLevel(level)
     ? { name: 'Boss arena', shape: 'rect', pillars: 'dots', crate: 0.4 }
     : MAZES[(level - 1) % MAZES.length];
   grid = [];

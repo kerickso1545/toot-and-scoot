@@ -300,7 +300,7 @@ var THEMES = {
 var THEME_ROTATION = ['bathroom', 'sewer', 'construction', 'royal'];
 var BOSS_THEME = 'bossArena';
 function themeForLevel(level) {
-  if (level % 10 === 0) return BOSS_THEME;
+  if (isBossLevel(level)) return BOSS_THEME;
   return THEME_ROTATION[(level - 1) % THEME_ROTATION.length];
 }
 

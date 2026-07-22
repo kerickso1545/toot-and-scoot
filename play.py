@@ -5,6 +5,9 @@ in your browser (like vite's dev server). Leave the console window open
 while playing; close it to stop the server.
 
 Extras:
+- Boss mode: `python play.py --level 5` starts every new game at that level
+  (bosses are every 5th level, so 5, 10, 15... jump straight to the fight).
+  Double-clicking without arguments starts at level 1 as usual.
 - Fixed port 8765 so the browser origin (and the localStorage leaderboard)
   stays the same every time. Re-running while the server is up just opens
   another browser tab.
@@ -14,6 +17,7 @@ Extras:
   title screen. The reload snippet is injected at serve time only — the
   files on disk are untouched.
 """
+import argparse
 import functools
 import http.server
 import os
@@ -26,6 +30,14 @@ PORT = 8765
 GAME = "toot-and-scoot.html"
 HERE = os.path.dirname(os.path.abspath(__file__))
 URL = "http://127.0.0.1:%d/%s" % (PORT, GAME)
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Toot and Scoot launcher")
+    p.add_argument("--level", type=int, default=1, metavar="N",
+                   help="boss mode: start every new game at level N "
+                        "(bosses are every 5th level)")
+    return p.parse_args()
 
 WATCH_DIRS = ["css", "js"]
 WATCH_FILES = [GAME]
@@ -139,10 +151,15 @@ def watch_escape_key(httpd):
 
 
 def main():
+    args = parse_args()
+    url = URL
+    if args.level > 1:
+        url += "?level=%d" % max(1, min(99, args.level))
+
     if port_in_use(PORT):
         # Server already running from a previous double-click: just open the game.
         print("Server already running - opening the game...")
-        webbrowser.open(URL)
+        webbrowser.open(url)
         return
 
     handler = functools.partial(Handler, directory=HERE)
@@ -153,13 +170,15 @@ def main():
     print("=" * 46)
     print("   TOOT AND SCOOT is starting!  *pffffft*")
     print("=" * 46)
-    print("Game: " + URL)
+    print("Game: " + url)
+    if args.level > 1:
+        print("BOSS MODE: new games start at level %d  *braaap*" % args.level)
     print()
     print("Auto-reloads when game files change.")
     print("Keep this window open while you play.")
     print("Press [ESC] (or close this window) to stop.")
 
-    threading.Timer(0.5, webbrowser.open, [URL]).start()
+    threading.Timer(0.5, webbrowser.open, [url]).start()
     threading.Thread(target=watch_escape_key, args=(httpd,), daemon=True).start()
     try:
         httpd.serve_forever()

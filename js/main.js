@@ -46,6 +46,13 @@ var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
+// ---- boss mode: play.py --level N opens the game with ?level=N so every new
+// game starts at that level (great for jumping straight to a boss fight) ----
+var startAtLevel = 1;
+(function () {
+  var m = /[?&]level=(\d+)/.exec(location.search);
+  if (m) startAtLevel = Math.max(1, Math.min(99, parseInt(m[1], 10) || 1));
+})();
 // level-start countdown ("3, 2, 1, SCOOT!!") — dt-driven in animate(), NOT a
 // timeout, so pausing freezes it and quitting cleans it up like everything else
 var countdownT = 0, countdownPhase = -1;
@@ -231,7 +238,7 @@ function startLevel(keepStats) {
   document.getElementById('minimap').style.display = numPlayers === 3 ? 'none' : 'block';
 
   var spawns = levelSpawns.slice(numPlayers);
-  if (level % 10 === 0) {
+  if (isBossLevel(level)) {
     // BOSS FIGHT: one giant rival with 1000 health
     var bs = spawns[0] || [7, 6];
     var bossBot = makeBot(bs[0], bs[1], 0x4e342e, 'The Big Stinker');
@@ -346,9 +353,15 @@ function startGame() {
   bumpSession();               // invalidate every delayed callback from the old game
   padDiscMsg = '';
   assignPads();                // lock controller assignments for this match
-  level = 1;
+  level = startAtLevel;
   if (numPlayers === 2) round2p++;
   startLevel(false);
+  if (level > 1) {
+    // boss mode: say where we're jumping in (normal games start quiet at L1)
+    showLevelMsg(isBossLevel(level)
+      ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+      : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+  }
 }
 function resetTransientUI() {
   // hide/clear every transient overlay, timer, and helper mesh.
@@ -1604,7 +1617,7 @@ function animate() {
             if (!transitioning) return;   // belt-and-braces: player quit during the transition
             level++;
             startLevel(true);
-            showLevelMsg(level % 10 === 0
+            showLevelMsg(isBossLevel(level)
               ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
               : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
             transitioning = false;
@@ -1622,7 +1635,7 @@ function animate() {
             if (!transitioning) return;   // belt-and-braces: player quit during the transition
             level++;
             startLevel(true);
-            showLevelMsg(level % 10 === 0
+            showLevelMsg(isBossLevel(level)
               ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
               : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
             transitioning = false;
