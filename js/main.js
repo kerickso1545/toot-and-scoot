@@ -217,7 +217,21 @@ function startLevel(keepStats) {
     document.getElementById('hudP3').style.display = numPlayers >= 3 ? 'block' : 'none';
     document.getElementById('slots').style.display = 'none';
     document.getElementById('hudBL').style.display = 'none';
+    // the game tile (level/difficulty/rivals): top-center in 2P; bottom-right
+    // over the bird's-eye quadrant in 3P (where the minimap sits in 1P/2P)
+    var hg = document.getElementById('hudGame');
+    hg.style.display = 'block';
+    if (numPlayers === 3) {
+      hg.style.top = 'auto'; hg.style.bottom = '14px';
+      hg.style.left = 'auto'; hg.style.right = '14px';
+      hg.style.transform = 'none';
+    } else {
+      hg.style.top = '14px'; hg.style.bottom = 'auto';
+      hg.style.left = '50%'; hg.style.right = 'auto';
+      hg.style.transform = 'translateX(-50%)';
+    }
   } else {
+    document.getElementById('hudGame').style.display = 'none';
     player2 = null;
     player3 = null;
     document.getElementById('hudP3').style.display = 'none';
@@ -1709,9 +1723,13 @@ function animate() {
     var puNames = PU_NAME, puColors = PU_COLOR;
     if (twoPlayer) {
       document.getElementById('hudTL').innerHTML = twoPHudHtml('Player 1', '#64b5f6', player);
-      document.getElementById('hudTR').innerHTML = twoPHudHtml('Player 2', '#81c784', player2) +
-        '<div class="hsub" style="margin-top:4px">Level ' + level + ' &middot; Rivals left: ' + aliveBots + '</div>';
+      document.getElementById('hudTR').innerHTML = twoPHudHtml('Player 2', '#81c784', player2);
       if (player3) document.getElementById('hudP3').innerHTML = twoPHudHtml('Player 3', '#ea80fc', player3);
+      document.getElementById('hudGame').innerHTML =
+        '<div class="hlabel">Level</div>' +
+        '<div class="hbig">' + level + '</div>' +
+        '<div class="hsub">' + ['Easy', 'Medium', 'Hard'][difficulty] + '</div>' +
+        '<div class="hsub" style="color:#ffd54f">Rivals left ' + aliveBots + '</div>';
       renderer.autoClear = true;
     } else {
     document.getElementById('hLevel').textContent = level;

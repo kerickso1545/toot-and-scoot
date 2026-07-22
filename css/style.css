@@ -73,6 +73,9 @@
   #hudTL { top: 14px; left: 14px; }
   #hudTR { top: 14px; right: 14px; }
   #hudP3 { bottom: 14px; left: 14px; display: none; }
+  /* multiplayer game tile (level/difficulty/rivals — never inside a player
+     tile); JS moves it bottom-right over the bird's-eye quadrant in 3P */
+  #hudGame { top: 14px; left: 50%; transform: translateX(-50%); display: none; }
   #stambar {
     position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%);
     width: 240px; height: 14px; z-index: 5; pointer-events: none;

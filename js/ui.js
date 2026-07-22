@@ -460,17 +460,21 @@ function superStateText(p) {
   return p.maskTime > 0 ? Math.ceil(p.maskTime) + 's' : p.superUsed ? 'used' : SUPER_SHORT[p.superType];
 }
 function twoPHudHtml(label, col, p) {
+  // player tile styled EXACTLY like the 1P panel: hlabel on top, one hbig
+  // number (score), hsub lines below. Level/difficulty/rivals live in the
+  // separate #hudGame tile — never inside a player tile.
   var item = p.held ? PU_NAME[p.held] : '—';
   var stCol = p.stamina > 40 ? '#66bb6a' : p.stamina > 15 ? '#fdd835' : '#e53935';
   var stBar = p.alive
-    ? '<div style="width:120px;height:8px;background:rgba(0,0,0,0.5);border:2px solid #fff;border-radius:5px;margin:5px auto 0;overflow:hidden">' +
+    ? '<div style="width:120px;height:8px;background:rgba(0,0,0,0.5);border:2px solid #fff;border-radius:5px;margin:4px auto;overflow:hidden">' +
       '<div style="height:100%;width:' + Math.round(p.stamina) + '%;background:' + stCol + '"></div></div>'
     : '';
-  return '<div class="hlabel" style="color:' + col + '">' + label + ' · Wins ' + (p.wins || 0) + ' · ' + (p.score || 0) + ' pts</div>' + stBar +
+  return '<div class="hlabel" style="color:' + col + '">' + label + '</div>' +
+    '<div class="hbig">' + (p.score || 0) + '</div>' +
+    '<div class="hsub" style="color:#ffd54f">Wins ' + (p.wins || 0) + '</div>' + stBar +
     '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range + ' · Spd ' + p.speed.toFixed(1) +
       (p.lives > 0 ? ' · Lives ' + p.lives : '') +
       (p.beansTime > 0 ? ' · BEANS ' + Math.ceil(p.beansTime) + 's!' : '') :
       'KNOCKED OUT' + (p.specName ? ' — watching ' + p.specName : '') + ' (A = switch)') + '</div>' +
-    '<div class="hsub">Item (A): ' + item + '</div>' +
-    '<div class="hsub">Super (X): ' + superStateText(p) + '</div>';
+    '<div class="hsub">Item (A): ' + item + ' · Super (X): ' + superStateText(p) + '</div>';
 }

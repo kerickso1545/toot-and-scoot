@@ -48,13 +48,17 @@ kill/win checks → HUD → render (1-3 viewports via scissor).
 - `rulespanel` — separate scrollable How-to-play page
 - `pausemenu` / `settingsmenu` (`pausemsg` for controller-disconnect notices)
 - `initials` — 3-letter high-score entry
-- HUD (`hudroot`): `hudTL`, `hudTR`, `hudP3` panels, `slots` (A/X item boxes,
-  1P only), `hudBL` chips (1P), `stambar`, `bossbar`, `minimap` canvas,
+- HUD (`hudroot`): `hudTL`, `hudTR`, `hudP3` panels, `hudGame` (multiplayer
+  game tile: level/difficulty/rivals — top-center in 2P, bottom-right over
+  the bird's-eye quadrant in 3P; positioned by startLevel), `slots` (A/X item
+  boxes, 1P only), `hudBL` chips (1P), `stambar`, `bossbar`, `minimap` canvas,
   `levelmsg` banner, `maskoverlay` (goggles SVG), `blind0-2` (STINKED covers),
   `pmsg0-2` (per-player contextual messages)
 
 HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
 `hRivals`) and multiplayer `twoPHudHtml()` strings — 1P ids only exist in 1P.
+Multiplayer player tiles mirror the 1P panel structure (hlabel / hbig score /
+hsub lines); game info never lives inside a player tile.
 
 ## Core state (globals)
 

@@ -88,7 +88,8 @@ still works to set a start level directly without the picker.
 - **Scoring**: 10 per crate, 100 per rival, 200 per player KO, 500 per
   level/round win, boss hits 100 each + 1000 bonus
 - HUD: kart-racer style panels, item boxes with button labels, minimap
-  (1P/2P), stamina bar, boss bar
+  (1P/2P), stamina bar, boss bar; in split screen every player tile matches
+  the 1P panel look, and level/difficulty/rivals get their own game tile
 
 ### Tech notes
 - Plain HTML/CSS/JS files (no build step): `toot-and-scoot.html` shell +
