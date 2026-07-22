@@ -1086,10 +1086,17 @@ function controlHuman(p, pd, kb, dt) {
 
 var FOV_BASE = 70, FOV_SPRINT_KICK = 5;   // sprint widens FOV by 5° (subtle; plan cap 6°)
 
+var CAM_EDGE_CLEAR = TS + 0.8;   // min camera height over/behind the outer ring
 function camBlockedAt(x, y, z) {
-  if (y >= TS) return false;                       // above wall height — always clear
   var gx = Math.floor(x / TS), gz = Math.floor(z / TS);
-  if (gx < 0 || gz < 0 || gx >= COLS || gz >= ROWS) return false;
+  // On or beyond the arena's outer ring the camera may never duck down low
+  // "behind an outside wall": below CAM_EDGE_CLEAR counts as blocked out
+  // there, so the lift is forced to keep the eye high enough to actually see
+  // over the edge wall instead of skimming its top (or zooming into the
+  // player's face). Kept within maxPitch reach even when hugging the wall:
+  // worst case needs atan((CAM_EDGE_CLEAR-1.25)/0.5) ~= 1.26 < 1.35.
+  if (gx <= 0 || gz <= 0 || gx >= COLS - 1 || gz >= ROWS - 1) return y < CAM_EDGE_CLEAR;
+  if (y >= TS) return false;                       // above wall height — always clear
   var g = grid[gz][gx];
   return g === 1 || g === 2 || g === 3;            // walls, crates, trap walls (never the floor)
 }
@@ -1102,7 +1109,7 @@ function camRayHit(p, dx, dy, dz, want) {
   return want;
 }
 function placeCam(cam, p, dt) {
-  var want = 6.5, comfy = 2.4, maxPitch = 1.35;
+  var want = 6.5, comfy = 3.0, maxPitch = 1.35;
   // If a wall close behind would force an extreme zoom-in (character fills the
   // screen), ride the camera UP over the wall instead: find the smallest extra
   // pitch that restores a comfortable distance (walls have no ceilings, so
