@@ -46,6 +46,9 @@ var player, running = false, gameOver = false;
 var difficulty = 0, level = 1, levelParams = null, transitioning = false;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
+// level-start countdown ("3, 2, 1, SCOOT!!") — dt-driven in animate(), NOT a
+// timeout, so pausing freezes it and quitting cleans it up like everything else
+var countdownT = 0, countdownPhase = -1;
 // ---- game session + tracked delayed transitions ----
 // EVERY delayed callback that mutates game state goes through later(); bumpSession()
 // (called from startGame / quit / endGame) both clears the pending timeouts AND
@@ -224,6 +227,86 @@ function startLevel(keepStats) {
   }
   running = true; gameOver = false;
   overlay.style.display = 'none';
+  startCountdown();
+}
+
+// ---------- level-start countdown ----------
+// While countdownT > 0 the world renders and cameras place normally, but the
+// whole simulation (inputs, bots, bombs, timers, win checks) stays frozen so
+// everyone can find themselves on screen — see the freeze guard in animate().
+function cssColorOf(hex) { return '#' + ('00000' + hex.toString(16)).slice(-6); }
+function makeBadgeSprite(label, cssColor) {
+  // canvas-painted "P1"/"P2"/"P3" billboard in the player's color
+  var cnv = document.createElement('canvas');
+  cnv.width = 128; cnv.height = 128;
+  var c = cnv.getContext('2d');
+  c.beginPath(); c.arc(64, 64, 54, 0, Math.PI * 2);
+  c.fillStyle = cssColor; c.fill();
+  c.lineWidth = 8; c.strokeStyle = '#ffffff'; c.stroke();
+  c.font = 'bold 56px "Arial Black", Arial, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineWidth = 9; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.strokeText(label, 64, 67);
+  c.fillStyle = '#ffffff'; c.fillText(label, 64, 67);
+  var mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cnv), transparent: true, depthWrite: false });
+  var s = new THREE.Sprite(mat);
+  s.scale.set(1.7, 1.7, 1);
+  return s;
+}
+function removeCountdownBadge(p) {
+  if (p && p.cdBadge) {
+    if (p.mesh) p.mesh.remove(p.cdBadge);
+    if (p.cdBadge.material.map) p.cdBadge.material.map.dispose();
+    p.cdBadge.material.dispose();
+    p.cdBadge = null;
+  }
+}
+function startCountdown() {
+  countdownT = 3.6;
+  countdownPhase = -1;
+  humans().forEach(function (p, i) {
+    removeCountdownBadge(p);
+    var s = makeBadgeSprite('P' + (i + 1), cssColorOf(p.baseColor));
+    s.position.set(0, 3.3, 0);
+    p.mesh.add(s);
+    p.cdBadge = s;
+    // center the big number in THIS player's viewport (same rects as the
+    // scissor renderer); a bit low so the fullscreen levelmsg banner stays clear
+    var el = document.getElementById('cd' + i);
+    if (el) {
+      var r = viewRect(p);
+      el.style.left = (r.l + r.w / 2) + '%';
+      el.style.top = (r.t + r.h * 0.58) + '%';
+    }
+  });
+  updateCountdown(0);
+}
+function endCountdown() {
+  countdownT = 0;
+  countdownPhase = -1;
+  humans().forEach(removeCountdownBadge);
+  for (var i = 0; i < 3; i++) {
+    var el = document.getElementById('cd' + i);
+    if (el) el.style.display = 'none';
+  }
+}
+function updateCountdown(dt) {
+  countdownT -= dt;
+  if (countdownT <= 0) { endCountdown(); return; }
+  // 3 / 2 / 1 for a second each, then "SCOOT!!" for the last 0.6s
+  var phase = countdownT > 0.6 ? Math.ceil(countdownT - 0.6) : 0;
+  if (phase !== countdownPhase) {
+    countdownPhase = phase;
+    var text = phase > 0 ? '' + phase : 'SCOOT!!';
+    humans().forEach(function (p, i) {
+      var el = document.getElementById('cd' + i);
+      if (!el) return;
+      el.textContent = text;
+      el.classList.toggle('scoot', phase === 0);
+      el.style.display = 'block';
+    });
+    if (phase > 0) snd(620, 0.12, 'square');
+    else { fart(FARTS.player, true); snd(930, 0.22, 'sine'); }
+  }
 }
 
 function startGame() {
@@ -237,6 +320,7 @@ function startGame() {
 function resetTransientUI() {
   // hide/clear every transient overlay, timer, and helper mesh.
   // safe to call any time: quit, endGame, and every startLevel go through here.
+  endCountdown();
   maskoverlay.style.display = 'none';
   maskoverlay.style.opacity = '1';
   for (var i = 0; i < 3; i++) {
@@ -1155,16 +1239,21 @@ function animate() {
   }
 
   if (running && !menuOpen && (locked || pad)) {
+    // level-start countdown: the world renders and cameras place, but nobody
+    // moves — no inputs, no bots, no timers, no win checks — until SCOOT!!
+    // (menuOpen skips this whole block, so pausing freezes the countdown too)
+    var frozen = countdownT > 0;
+    if (frozen) updateCountdown(dt);
     // each human: controller (and keyboard for P1) drives movement, camera, and buttons
     if (player.alive) {
-      controlHuman(player, p1pad, true, dt);
+      if (!frozen) controlHuman(player, p1pad, true, dt);
       placeCam(camera, player, dt); applyShake(camera, player, dt);
     } else if (twoPlayer) {
       spectate(player, p1pad, camera, dt);
     }
     if (twoPlayer && player2) {
       if (player2.alive) {
-        controlHuman(player2, p2pad, false, dt);
+        if (!frozen) controlHuman(player2, p2pad, false, dt);
         placeCam(camera2, player2, dt); applyShake(camera2, player2, dt);
       } else {
         spectate(player2, p2pad, camera2, dt);
@@ -1172,311 +1261,313 @@ function animate() {
     }
     if (twoPlayer && player3) {
       if (player3.alive) {
-        controlHuman(player3, p3pad, false, dt);
+        if (!frozen) controlHuman(player3, p3pad, false, dt);
         placeCam(camera3, player3, dt); applyShake(camera3, player3, dt);
       } else {
         spectate(player3, p3pad, camera3, dt);
       }
     }
     // targeting previews for held Trap Wall / Turbo Toot
-    updatePreviews();
+    if (!frozen) updatePreviews();
     // fart-cloud particles, dutch-oven swirls, blind-cloud bobbing
     updateFX(dt);
 
-    // bombs
-    bombs.slice().forEach(function (b) {
-      b.timer -= dt;
-      // the fart cloud slowly swells and wobbles while it lingers
-      var s = (1 + (2.2 - b.timer) * 0.3) * (1 + Math.sin(b.timer * 10) * 0.08);
-      b.mesh.scale.set(s, s * 0.8, s);
-      if (b.timer <= 0) explode(b);
-    });
-    // blind timers: cover the stinked player's part of the screen
-    humans().forEach(function (p, hi) {
-      var el = document.getElementById('blind' + hi);
-      if (!el) return;
-      if (p.blindTime > 0) {
-        p.blindTime -= dt;
-        if (p.blindTime <= 0) {
-          p.blindTime = 0;
-          removeBlindCloud(p);
-          el.style.display = 'none';
-        } else {
-          var r;
-          if (!twoPlayer) r = { l: 0, t: 0, w: 100, h: 100 };
-          else if (numPlayers === 2) r = p === player ? { l: 0, t: 0, w: 50, h: 100 } : { l: 50, t: 0, w: 50, h: 100 };
-          else r = p === player ? { l: 0, t: 0, w: 50, h: 50 } : p === player2 ? { l: 50, t: 0, w: 50, h: 50 } : { l: 0, t: 50, w: 50, h: 50 };
-          el.style.left = r.l + '%'; el.style.top = r.t + '%';
-          el.style.width = r.w + '%'; el.style.height = r.h + '%';
-          el.style.display = 'flex';
-        }
-      } else {
-        el.style.display = 'none';
-      }
-    });
-    // revival speed-boost timer
-    humans().forEach(function (p) {
-      if (p.reviveTime > 0) p.reviveTime = Math.max(0, p.reviveTime - dt);
-    });
-    // bean power: leave a little fart on every tile you cross
-    humans().forEach(function (p) {
-      if (!p.alive || !(p.beansTime > 0)) return;
-      p.beansTime = Math.max(0, p.beansTime - dt);
-      var bt = tileOf(p);
-      if (p.trailTile && (bt.x !== p.trailTile.x || bt.z !== p.trailTile.z)) {
-        if (!bombAt(p.trailTile.x, p.trailTile.z)) {
-          placeBomb(p.trailTile.x, p.trailTile.z, 1, p, { fuse: 1.3, quiet: true });
-          var fc = tileCenter(p.trailTile.x, p.trailTile.z);
-          spawnMiniPuff(fc.x, fc.z);
-        }
-        p.trailTile = bt;
-      }
-    });
-    // holding an Extra Life makes your avatar shimmer rainbow
-    humans().forEach(function (p) {
-      if (!p.alive || p.maskTime > 0) return;   // the gas mask gray takes priority
-      if (p.lives > 0) p.mesh.userData.mat.color.setHSL((now / 700) % 1, 0.9, 0.55);
-      else p.mesh.userData.mat.color.setHex(p.baseColor);
-    });
-    // gas mask timers: gray while worn, blinks before wearing off
-    humans().forEach(function (p) {
-      if (p.maskTime <= 0) return;
-      p.maskTime -= dt;
-      if (p.maskTime <= 0) {
-        p.maskTime = 0;
-        p.mesh.userData.mat.color.setHex(p.baseColor);
-        if (p === player && !twoPlayer) maskoverlay.style.display = 'none';
-      } else {
-        var blink = p.maskTime < 1.5 && Math.floor(p.maskTime * 6) % 2 === 0;
-        p.mesh.userData.mat.color.setHex(blink ? p.baseColor : 0x37474f);
-        if (p === player && !twoPlayer) maskoverlay.style.opacity = blink ? '0.35' : '1';
-      }
-    });
-    // dutch oven domes fade out with their walls
-    for (var di = domes.length - 1; di >= 0; di--) {
-      domes[di].timer -= dt;
-      if (domes[di].timer <= 0) { scene.remove(domes[di].mesh); domes.splice(di, 1); }
-    }
-    // temporary trap walls tick down, blink near the end, then vanish
-    for (var wi = walls.length - 1; wi >= 0; wi--) {
-      var w = walls[wi];
-      w.timer -= dt;
-      w.mesh.visible = w.timer > 2 || Math.floor(w.timer * 5) % 2 === 0;
-      if (w.timer <= 0) {
-        grid[w.gz][w.gx] = 0;
-        scene.remove(w.mesh);
-        walls.splice(wi, 1);
-      }
-    }
-    // explosions
-    for (var i = explosions.length - 1; i >= 0; i--) {
-      explosions[i].timer -= dt;
-      if (explosions[i].timer <= 0) {
-        scene.remove(explosions[i].mesh);
-        explosions.splice(i, 1);
-      }
-    }
-    // powerups spin + pickup
-    powerups.slice().forEach(function (u) {
-      u.mesh.rotation.y += dt * 2.5;
-      u.mesh.position.y = 0.6 + Math.sin(now / 300) * 0.12;
-      if (u.type === 'rainbow') {
-        u.mesh.material.color.setHSL((now / 600) % 1, 1, 0.55);
-        u.mesh.material.emissive.setHSL((now / 600) % 1, 1, 0.35);
-      }
-      var consumed = false;
-      humans().some(function (p) {
-        if (!p.alive) return false;
-        var pt = tileOf(p);
-        if (pt.x !== u.gx || pt.z !== u.gz) return false;
-        if (u.type === 'rainbow') {
-          // extra life!
-          p.lives = (p.lives || 0) + 1;
-          snd(523, 0.12, 'sine'); snd(659, 0.12, 'sine'); snd(784, 0.25, 'sine');
-        } else if (u.type === 'beans') {
-          // eat them on the spot: fart trail for 6 seconds!
-          p.beansTime = 6;
-          p.trailTile = tileOf(p);
-          snd(500, 0.1, 'sine'); snd(330, 0.18, 'sine');
-        } else if (u.type === 'bomb') {
-          // passive: applies instantly; at the cap it stays on the floor
-          if (p.maxBombs >= MAX_GAS) { cappedFx(p, 'Gas full', 'cap'); return true; }
-          p.maxBombs++;
-          snd(660, 0.15, 'sine');
-        } else if (u.type === 'range') {
-          if (p.range >= MAX_BLAST) { cappedFx(p, 'Blast full', 'cap'); return true; }
-          p.range++;
-          snd(660, 0.15, 'sine');
-        } else if (u.type === 'speed') {
-          if (p.speed >= MAX_SPEED - 0.001) { cappedFx(p, 'Speed full', 'cap'); return true; }
-          p.speed = Math.min(MAX_SPEED, p.speed + SPEED_STEP);
-          snd(660, 0.15, 'sine');
-        } else {
-          // active held item (wall/spray/turbo): hands full? it stays on the floor
-          if (p.held) { cappedFx(p, 'Item slot full', 'slot'); return true; }
-          p.held = u.type;
-          snd(660, 0.15, 'sine');
-        }
-        consumed = true;
-        scene.remove(u.mesh);
-        powerups.splice(powerups.indexOf(u), 1);
-        return true;
+    if (!frozen) { // ---- SIMULATION: fully frozen during the level-start countdown ----
+      // bombs
+      bombs.slice().forEach(function (b) {
+        b.timer -= dt;
+        // the fart cloud slowly swells and wobbles while it lingers
+        var s = (1 + (2.2 - b.timer) * 0.3) * (1 + Math.sin(b.timer * 10) * 0.08);
+        b.mesh.scale.set(s, s * 0.8, s);
+        if (b.timer <= 0) explode(b);
       });
-      // bots collect PASSIVE upgrades only — never held items, beans, or extra lives
-      if (!consumed && (u.type === 'bomb' || u.type === 'range' || u.type === 'speed')) {
-        for (var ubi = 0; ubi < bots.length; ubi++) {
-          var ubb = bots[ubi];
-          if (!ubb.alive || ubb.gx !== u.gx || ubb.gz !== u.gz) continue;
-          if (!botWantsPU(ubb, u)) break;   // capped: walk over it, leave it
-          if (u.type === 'bomb') ubb.maxBombs++;
-          else if (u.type === 'range') ubb.range++;
-          else ubb.speed = Math.min(MAX_SPEED, ubb.speed + SPEED_STEP);
-          snd(660, 0.1, 'sine');
-          scene.remove(u.mesh);
-          powerups.splice(powerups.indexOf(u), 1);
-          break;
-        }
-      }
-    });
-    // bots
-    bots.forEach(function (bot) {
-      if (!bot.alive) return;
-      if (bot.blindTime > 0) {
-        bot.blindTime -= dt;
-        if (bot.blindTime <= 0) { bot.blindTime = 0; removeBlindCloud(bot); }
-      }
-      if (bot.hitCd > 0) bot.hitCd -= dt;
-      if (bot.boss) {
-        var bscale = bot.hitCd > 0.45 ? 2.5 : 2.2;                  // flinch when hit
-        if (bot.phase === 2) bscale += 0.06 + Math.sin(now / 130) * 0.1;   // enraged: stronger pulsing
-        bot.mesh.scale.setScalar(bscale);
-        if (bot.phase === 2) updateBossSpecial(bot, dt);
-      }
-      botThink(bot, dt);
-      if (bot.moving) {
-        var c = tileCenter(bot.tx, bot.tz);
-        var dx = c.x - bot.mesh.position.x, dz = c.z - bot.mesh.position.z;
-        var dist = Math.hypot(dx, dz);
-        var step = bot.speed * dt;
-        if (dist <= step) {
-          bot.mesh.position.set(c.x, 0, c.z);
-          bot.gx = bot.tx; bot.gz = bot.tz; bot.moving = false;
-        } else {
-          bot.mesh.position.x += dx / dist * step;
-          bot.mesh.position.z += dz / dist * step;
-          bot.mesh.rotation.y = Math.atan2(dx, dz);
-        }
-      }
-      var tiles = [[bot.gx, bot.gz]];
-      if (bot.moving) tiles.push([bot.tx, bot.tz]);
-      var hitE = null;
-      tiles.forEach(function (t) {
-        explosions.forEach(function (e2) { if (e2.gx === t[0] && e2.gz === t[1]) hitE = e2; });
-      });
-      if (hitE) {
-        if (bot.boss) {
-          // the boss takes 100 damage per blast (not from his own farts)
-          if ((bot.hitCd || 0) <= 0 && hitE.owner !== bot) {
-            bot.hp -= 100;
-            bot.hitCd = 0.6;
-            snd(85, 0.35, 'sawtooth');
-            if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;
-            if (bot.hp > 0 && bot.phase === 1 && bot.hp <= 500) enrageBoss(bot);   // phase 2 triggers ONCE at half health
-            if (bot.hp <= 0) {
-              bot.alive = false;
-              scene.remove(bot.mesh);
-              clearBossWarnings();
-              snd(60, 0.8, 'sawtooth'); snd(40, 1.0, 'triangle');
-              if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 1000;   // boss bonus!
-            }
+      // blind timers: cover the stinked player's part of the screen
+      humans().forEach(function (p, hi) {
+        var el = document.getElementById('blind' + hi);
+        if (!el) return;
+        if (p.blindTime > 0) {
+          p.blindTime -= dt;
+          if (p.blindTime <= 0) {
+            p.blindTime = 0;
+            removeBlindCloud(p);
+            el.style.display = 'none';
+          } else {
+            var r;
+            if (!twoPlayer) r = { l: 0, t: 0, w: 100, h: 100 };
+            else if (numPlayers === 2) r = p === player ? { l: 0, t: 0, w: 50, h: 100 } : { l: 50, t: 0, w: 50, h: 100 };
+            else r = p === player ? { l: 0, t: 0, w: 50, h: 50 } : p === player2 ? { l: 50, t: 0, w: 50, h: 50 } : { l: 0, t: 50, w: 50, h: 50 };
+            el.style.left = r.l + '%'; el.style.top = r.t + '%';
+            el.style.width = r.w + '%'; el.style.height = r.h + '%';
+            el.style.display = 'flex';
           }
         } else {
-          bot.alive = false;
-          charSpin(bot);   // knockout spin-out; removal delayed past the 0.6s animation
-          (function (deadBot) { later(function () { scene.remove(deadBot.mesh); }, 650); })(bot);
-          snd(120, 0.5, 'triangle');
-          if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;   // 100 points per rival YOU gassed
+          el.style.display = 'none';
         }
-      }
-    });
-    // player hit?
-    // did anyone get gassed?
-    humans().forEach(function (p, hIdx) {
-      if (!p.alive || transitioning || p.maskTime > 0) return;
-      var t = tileOf(p);
-      var hitBy = null;
-      explosions.forEach(function (e2) { if (e2.gx === t.x && e2.gz === t.z) hitBy = e2; });
-      if (hitBy) {
-        if (p.lives > 0) {
-          // the rainbow saves you: spend a life, flash invincible for 2 seconds
-          // with bean-style double speed to escape the danger
-          p.lives--;
-          p.maskTime = 2;
-          p.reviveTime = 2;
-          showLevelMsg((twoPlayer ? 'Player ' + (hIdx + 1) : 'You') + ' used an Extra Life!');
-          snd(784, 0.12, 'sine'); snd(523, 0.2, 'sine');
-          return;
+      });
+      // revival speed-boost timer
+      humans().forEach(function (p) {
+        if (p.reviveTime > 0) p.reviveTime = Math.max(0, p.reviveTime - dt);
+      });
+      // bean power: leave a little fart on every tile you cross
+      humans().forEach(function (p) {
+        if (!p.alive || !(p.beansTime > 0)) return;
+        p.beansTime = Math.max(0, p.beansTime - dt);
+        var bt = tileOf(p);
+        if (p.trailTile && (bt.x !== p.trailTile.x || bt.z !== p.trailTile.z)) {
+          if (!bombAt(p.trailTile.x, p.trailTile.z)) {
+            placeBomb(p.trailTile.x, p.trailTile.z, 1, p, { fuse: 1.3, quiet: true });
+            var fc = tileCenter(p.trailTile.x, p.trailTile.z);
+            spawnMiniPuff(fc.x, fc.z);
+          }
+          p.trailTile = bt;
         }
-        p.alive = false;
-        if (twoPlayer) {
-          // multiplayer only: knockout spin-out, removal delayed past the animation.
-          // In 1P, death calls endGame (running=false + bumpSession) so no spin
-          // would play — keep the instant removal there (WS-B handoff safety note).
-          charSpin(p);
-          (function (deadP) { later(function () { scene.remove(deadP.mesh); }, 650); })(p);
+      });
+      // holding an Extra Life makes your avatar shimmer rainbow
+      humans().forEach(function (p) {
+        if (!p.alive || p.maskTime > 0) return;   // the gas mask gray takes priority
+        if (p.lives > 0) p.mesh.userData.mat.color.setHSL((now / 700) % 1, 0.9, 0.55);
+        else p.mesh.userData.mat.color.setHex(p.baseColor);
+      });
+      // gas mask timers: gray while worn, blinks before wearing off
+      humans().forEach(function (p) {
+        if (p.maskTime <= 0) return;
+        p.maskTime -= dt;
+        if (p.maskTime <= 0) {
+          p.maskTime = 0;
+          p.mesh.userData.mat.color.setHex(p.baseColor);
+          if (p === player && !twoPlayer) maskoverlay.style.display = 'none';
         } else {
-          scene.remove(p.mesh);
+          var blink = p.maskTime < 1.5 && Math.floor(p.maskTime * 6) % 2 === 0;
+          p.mesh.userData.mat.color.setHex(blink ? p.baseColor : 0x37474f);
+          if (p === player && !twoPlayer) maskoverlay.style.opacity = blink ? '0.35' : '1';
         }
-        // 200 points for gassing another player
-        if (hitBy.owner && hitBy.owner !== p && hitBy.owner.score !== undefined) hitBy.owner.score += 200;
-        if (!twoPlayer) {
-          maskoverlay.style.display = 'none';
-          endGame('You got gassed on level ' + level + '! Pick a difficulty to try again');
+      });
+      // dutch oven domes fade out with their walls
+      for (var di = domes.length - 1; di >= 0; di--) {
+        domes[di].timer -= dt;
+        if (domes[di].timer <= 0) { scene.remove(domes[di].mesh); domes.splice(di, 1); }
+      }
+      // temporary trap walls tick down, blink near the end, then vanish
+      for (var wi = walls.length - 1; wi >= 0; wi--) {
+        var w = walls[wi];
+        w.timer -= dt;
+        w.mesh.visible = w.timer > 2 || Math.floor(w.timer * 5) % 2 === 0;
+        if (w.timer <= 0) {
+          grid[w.gz][w.gx] = 0;
+          scene.remove(w.mesh);
+          walls.splice(wi, 1);
         }
       }
-    });
-    if (twoPlayer && !transitioning) {
-      // versus round: last one standing wins the level, then EVERYONE moves on together
-      var aliveH = humans().filter(function (p) { return p.alive; });
-      var aliveBotCount = bots.filter(function (b) { return b.alive; }).length;
-      if (aliveH.length === 0) {
-        endGame('The rivals win! Press Start to play again');
-      } else if (aliveH.length === 1 && aliveBotCount === 0) {
-        transitioning = true;
-        var winner = aliveH[0];
-        winner.wins = (winner.wins || 0) + 1;
-        winner.score = (winner.score || 0) + 500;   // 500 point round-win bonus
-        var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
-        showLevelMsg(wname + ' wins the round!');
-        snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
-        later(function () {             // session-guarded AND cleared on quit/endGame/startGame
-          if (!transitioning) return;   // belt-and-braces: player quit during the transition
-          level++;
-          startLevel(true);
-          showLevelMsg(level % 10 === 0
-            ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
-            : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
-          transitioning = false;
-        }, 1700);
+      // explosions
+      for (var i = explosions.length - 1; i >= 0; i--) {
+        explosions[i].timer -= dt;
+        if (explosions[i].timer <= 0) {
+          scene.remove(explosions[i].mesh);
+          explosions.splice(i, 1);
+        }
       }
-    } else if (!twoPlayer) {
-      // level cleared?
-      if (player.alive && !transitioning && bots.length && bots.every(function (b) { return !b.alive; })) {
-        transitioning = true;
-        player.score += 500;   // 500 point bonus for winning the level
-        showLevelMsg('Level ' + level + ' cleared! +500');
-        snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
-        later(function () {             // session-guarded AND cleared on quit/endGame/startGame
-          if (!transitioning) return;   // belt-and-braces: player quit during the transition
-          level++;
-          startLevel(true);
-          showLevelMsg(level % 10 === 0
-            ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
-            : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
-          transitioning = false;
-        }, 1700);
+      // powerups spin + pickup
+      powerups.slice().forEach(function (u) {
+        u.mesh.rotation.y += dt * 2.5;
+        u.mesh.position.y = 0.6 + Math.sin(now / 300) * 0.12;
+        if (u.type === 'rainbow') {
+          u.mesh.material.color.setHSL((now / 600) % 1, 1, 0.55);
+          u.mesh.material.emissive.setHSL((now / 600) % 1, 1, 0.35);
+        }
+        var consumed = false;
+        humans().some(function (p) {
+          if (!p.alive) return false;
+          var pt = tileOf(p);
+          if (pt.x !== u.gx || pt.z !== u.gz) return false;
+          if (u.type === 'rainbow') {
+            // extra life!
+            p.lives = (p.lives || 0) + 1;
+            snd(523, 0.12, 'sine'); snd(659, 0.12, 'sine'); snd(784, 0.25, 'sine');
+          } else if (u.type === 'beans') {
+            // eat them on the spot: fart trail for 6 seconds!
+            p.beansTime = 6;
+            p.trailTile = tileOf(p);
+            snd(500, 0.1, 'sine'); snd(330, 0.18, 'sine');
+          } else if (u.type === 'bomb') {
+            // passive: applies instantly; at the cap it stays on the floor
+            if (p.maxBombs >= MAX_GAS) { cappedFx(p, 'Gas full', 'cap'); return true; }
+            p.maxBombs++;
+            snd(660, 0.15, 'sine');
+          } else if (u.type === 'range') {
+            if (p.range >= MAX_BLAST) { cappedFx(p, 'Blast full', 'cap'); return true; }
+            p.range++;
+            snd(660, 0.15, 'sine');
+          } else if (u.type === 'speed') {
+            if (p.speed >= MAX_SPEED - 0.001) { cappedFx(p, 'Speed full', 'cap'); return true; }
+            p.speed = Math.min(MAX_SPEED, p.speed + SPEED_STEP);
+            snd(660, 0.15, 'sine');
+          } else {
+            // active held item (wall/spray/turbo): hands full? it stays on the floor
+            if (p.held) { cappedFx(p, 'Item slot full', 'slot'); return true; }
+            p.held = u.type;
+            snd(660, 0.15, 'sine');
+          }
+          consumed = true;
+          scene.remove(u.mesh);
+          powerups.splice(powerups.indexOf(u), 1);
+          return true;
+        });
+        // bots collect PASSIVE upgrades only — never held items, beans, or extra lives
+        if (!consumed && (u.type === 'bomb' || u.type === 'range' || u.type === 'speed')) {
+          for (var ubi = 0; ubi < bots.length; ubi++) {
+            var ubb = bots[ubi];
+            if (!ubb.alive || ubb.gx !== u.gx || ubb.gz !== u.gz) continue;
+            if (!botWantsPU(ubb, u)) break;   // capped: walk over it, leave it
+            if (u.type === 'bomb') ubb.maxBombs++;
+            else if (u.type === 'range') ubb.range++;
+            else ubb.speed = Math.min(MAX_SPEED, ubb.speed + SPEED_STEP);
+            snd(660, 0.1, 'sine');
+            scene.remove(u.mesh);
+            powerups.splice(powerups.indexOf(u), 1);
+            break;
+          }
+        }
+      });
+      // bots
+      bots.forEach(function (bot) {
+        if (!bot.alive) return;
+        if (bot.blindTime > 0) {
+          bot.blindTime -= dt;
+          if (bot.blindTime <= 0) { bot.blindTime = 0; removeBlindCloud(bot); }
+        }
+        if (bot.hitCd > 0) bot.hitCd -= dt;
+        if (bot.boss) {
+          var bscale = bot.hitCd > 0.45 ? 2.5 : 2.2;                  // flinch when hit
+          if (bot.phase === 2) bscale += 0.06 + Math.sin(now / 130) * 0.1;   // enraged: stronger pulsing
+          bot.mesh.scale.setScalar(bscale);
+          if (bot.phase === 2) updateBossSpecial(bot, dt);
+        }
+        botThink(bot, dt);
+        if (bot.moving) {
+          var c = tileCenter(bot.tx, bot.tz);
+          var dx = c.x - bot.mesh.position.x, dz = c.z - bot.mesh.position.z;
+          var dist = Math.hypot(dx, dz);
+          var step = bot.speed * dt;
+          if (dist <= step) {
+            bot.mesh.position.set(c.x, 0, c.z);
+            bot.gx = bot.tx; bot.gz = bot.tz; bot.moving = false;
+          } else {
+            bot.mesh.position.x += dx / dist * step;
+            bot.mesh.position.z += dz / dist * step;
+            bot.mesh.rotation.y = Math.atan2(dx, dz);
+          }
+        }
+        var tiles = [[bot.gx, bot.gz]];
+        if (bot.moving) tiles.push([bot.tx, bot.tz]);
+        var hitE = null;
+        tiles.forEach(function (t) {
+          explosions.forEach(function (e2) { if (e2.gx === t[0] && e2.gz === t[1]) hitE = e2; });
+        });
+        if (hitE) {
+          if (bot.boss) {
+            // the boss takes 100 damage per blast (not from his own farts)
+            if ((bot.hitCd || 0) <= 0 && hitE.owner !== bot) {
+              bot.hp -= 100;
+              bot.hitCd = 0.6;
+              snd(85, 0.35, 'sawtooth');
+              if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;
+              if (bot.hp > 0 && bot.phase === 1 && bot.hp <= 500) enrageBoss(bot);   // phase 2 triggers ONCE at half health
+              if (bot.hp <= 0) {
+                bot.alive = false;
+                scene.remove(bot.mesh);
+                clearBossWarnings();
+                snd(60, 0.8, 'sawtooth'); snd(40, 1.0, 'triangle');
+                if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 1000;   // boss bonus!
+              }
+            }
+          } else {
+            bot.alive = false;
+            charSpin(bot);   // knockout spin-out; removal delayed past the 0.6s animation
+            (function (deadBot) { later(function () { scene.remove(deadBot.mesh); }, 650); })(bot);
+            snd(120, 0.5, 'triangle');
+            if (hitE.owner && hitE.owner.score !== undefined) hitE.owner.score += 100;   // 100 points per rival YOU gassed
+          }
+        }
+      });
+      // player hit?
+      // did anyone get gassed?
+      humans().forEach(function (p, hIdx) {
+        if (!p.alive || transitioning || p.maskTime > 0) return;
+        var t = tileOf(p);
+        var hitBy = null;
+        explosions.forEach(function (e2) { if (e2.gx === t.x && e2.gz === t.z) hitBy = e2; });
+        if (hitBy) {
+          if (p.lives > 0) {
+            // the rainbow saves you: spend a life, flash invincible for 2 seconds
+            // with bean-style double speed to escape the danger
+            p.lives--;
+            p.maskTime = 2;
+            p.reviveTime = 2;
+            showLevelMsg((twoPlayer ? 'Player ' + (hIdx + 1) : 'You') + ' used an Extra Life!');
+            snd(784, 0.12, 'sine'); snd(523, 0.2, 'sine');
+            return;
+          }
+          p.alive = false;
+          if (twoPlayer) {
+            // multiplayer only: knockout spin-out, removal delayed past the animation.
+            // In 1P, death calls endGame (running=false + bumpSession) so no spin
+            // would play — keep the instant removal there (WS-B handoff safety note).
+            charSpin(p);
+            (function (deadP) { later(function () { scene.remove(deadP.mesh); }, 650); })(p);
+          } else {
+            scene.remove(p.mesh);
+          }
+          // 200 points for gassing another player
+          if (hitBy.owner && hitBy.owner !== p && hitBy.owner.score !== undefined) hitBy.owner.score += 200;
+          if (!twoPlayer) {
+            maskoverlay.style.display = 'none';
+            endGame('You got gassed on level ' + level + '! Pick a difficulty to try again');
+          }
+        }
+      });
+      if (twoPlayer && !transitioning) {
+        // versus round: last one standing wins the level, then EVERYONE moves on together
+        var aliveH = humans().filter(function (p) { return p.alive; });
+        var aliveBotCount = bots.filter(function (b) { return b.alive; }).length;
+        if (aliveH.length === 0) {
+          endGame('The rivals win! Press Start to play again');
+        } else if (aliveH.length === 1 && aliveBotCount === 0) {
+          transitioning = true;
+          var winner = aliveH[0];
+          winner.wins = (winner.wins || 0) + 1;
+          winner.score = (winner.score || 0) + 500;   // 500 point round-win bonus
+          var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
+          showLevelMsg(wname + ' wins the round!');
+          snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
+          later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+            if (!transitioning) return;   // belt-and-braces: player quit during the transition
+            level++;
+            startLevel(true);
+            showLevelMsg(level % 10 === 0
+              ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+              : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+            transitioning = false;
+          }, 1700);
+        }
+      } else if (!twoPlayer) {
+        // level cleared?
+        if (player.alive && !transitioning && bots.length && bots.every(function (b) { return !b.alive; })) {
+          transitioning = true;
+          player.score += 500;   // 500 point bonus for winning the level
+          showLevelMsg('Level ' + level + ' cleared! +500');
+          snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
+          later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+            if (!transitioning) return;   // belt-and-braces: player quit during the transition
+            level++;
+            startLevel(true);
+            showLevelMsg(level % 10 === 0
+              ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+              : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+            transitioning = false;
+          }, 1700);
+        }
       }
-    }
+    } // ---- end of countdown-freeze guard ----
 
     // minimap: walls, crates, farts, power-ups, and everyone's position
     if (numPlayers !== 3) {

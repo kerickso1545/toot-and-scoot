@@ -124,3 +124,12 @@
     color: #ffd54f; font-family: 'Arial Black', Arial, sans-serif; font-size: 19px;
     text-shadow: 2px 2px 0 #000;
   }
+  .cdnum {
+    /* kart-racer countdown: one per viewport, centered via left/top from JS */
+    position: fixed; z-index: 7; pointer-events: none; display: none;
+    transform: translate(-50%, -50%); text-align: center;
+    color: #ffd54f; font-family: 'Arial Black', Arial, sans-serif; font-size: 110px;
+    -webkit-text-stroke: 4px #1a2036;
+    text-shadow: 6px 6px 0 rgba(0,0,0,0.8);
+  }
+  .cdnum.scoot { font-size: 58px; color: #aeea00; letter-spacing: 2px; }
