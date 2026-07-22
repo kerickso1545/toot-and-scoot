@@ -52,7 +52,8 @@ still works to set a start level directly without the picker.
   Air Freshener, Turbo Toot (blinds a victim for 5 s — pitch black screen for
   human victims)
 - **Legendary finds** (indestructible): Can of Beans (10% of drops — 6 s fart
-  trail at double speed), rainbow **Extra Life** (2% — auto-revive with 2 s
+  trail; the toots pop one at a time in drop order, never all at once, so you
+  can outrun your own trail), rainbow **Extra Life** (2% — auto-revive with 2 s
   invincible double-speed escape; avatar shimmers rainbow while carried)
 - **Superpowers** (X, one per level, rotating): Gas Mask, Silent But Deadly,
   Dutch Oven

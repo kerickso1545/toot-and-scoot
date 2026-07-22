@@ -417,6 +417,7 @@ function placeBomb(gx, gz, range, owner, opts) {
   scene.add(m);
   var b = { gx: gx, gz: gz, timer: (opts && opts.fuse) || 2.2, range: range, owner: owner, mesh: m };
   if (opts && opts.hidden) { b.hidden = true; m.visible = false; }
+  if (opts && opts.trail) b.trail = true;   // bean-trail toot: never chain-detonated
   bombs.push(b);
   if (opts && opts.hidden) {}                              // silent but deadly makes no sound
   else if (opts && opts.quiet) snd(220, 0.08);             // bean-trail toots are little ones
@@ -437,7 +438,10 @@ function explode(b) {
       if (grid[z][x] === 1 || grid[z][x] === 3) break;
       tiles.push([x, z]);
       var other = bombAt(x, z);
-      if (other) explode(other);
+      // bean-trail toots NEVER chain: they pop strictly on their own fuses,
+      // in drop order with even spacing, so the eater can actually outrun
+      // their own trail (one blast used to gang-detonate the whole line)
+      if (other && !other.trail) explode(other);
       if (grid[z][x] === 2) {
         removeCrate(x, z);
         if (Math.random() < 0.35) drops.push([x, z]);
@@ -852,7 +856,7 @@ function updateBossSpecial(bot, dt) {
         var m = fxGroundGlow(x, z, true);
         explosions.push({ gx: x, gz: z, timer: 0.5, mesh: m, owner: bot });
         var other = bombAt(x, z);
-        if (other) explode(other);
+        if (other && !other.trail) explode(other);   // trail toots keep their own fuses
       });
       bot.warnOrigin = null;
       fart(FARTS['The Big Stinker'], true);
@@ -1092,7 +1096,7 @@ function controlHuman(p, pd, kb, dt) {
   else p.stamina = Math.min(100, p.stamina + 20 * dt);
   if (p.stamina <= 0) p.exhausted = true;
   else if (p.stamina >= 30) p.exhausted = false;
-  var spd = p.speed * (p.beansTime > 0 || p.reviveTime > 0 ? 2 : 1);   // beans and extra-life revival: double speed
+  var spd = p.speed * (p.reviveTime > 0 ? 2 : 1);   // extra-life revival: double speed (beans: normal speed)
   if (sprinting) spd *= 1.6;
   var vx = (Math.sin(p.yaw) * -fwd + Math.cos(p.yaw) * str) / len * spd;
   var vz = (Math.cos(p.yaw) * -fwd - Math.sin(p.yaw) * str) / len * spd;
@@ -1395,7 +1399,7 @@ function animate() {
         var bt = tileOf(p);
         if (p.trailTile && (bt.x !== p.trailTile.x || bt.z !== p.trailTile.z)) {
           if (!bombAt(p.trailTile.x, p.trailTile.z)) {
-            placeBomb(p.trailTile.x, p.trailTile.z, 1, p, { fuse: 1.3, quiet: true });
+            placeBomb(p.trailTile.x, p.trailTile.z, 1, p, { fuse: 1.3, quiet: true, trail: true });
             var fc = tileCenter(p.trailTile.x, p.trailTile.z);
             spawnMiniPuff(fc.x, fc.z);
           }

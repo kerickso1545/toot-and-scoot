@@ -193,7 +193,9 @@ HUD panels swap innerHTML between 1P template (ids `hLevel`, `hDiff`, `hScore`,
 
 `MAX_GAS=4, MAX_BLAST=5, MAX_SPEED=7.0, SPEED_STEP=0.5`; bomb fuse 2.2s,
 blast linger 0.45s; trap wall 10s; Turbo Toot blind 5s; mask 8s; beans 6s at
-×2; sprint ×1.6, stamina 100, drain 10/s, refill 20/s, exhaustion floor 30;
+normal speed, trail fuse 1.3s, trail bombs never chain-detonate (pop in drop
+order — `b.trail` checked at both chain sites); sprint ×1.6, stamina 100,
+drain 10/s, refill 20/s, exhaustion floor 30;
 beans 10% of drops, Extra Life 2%; boss special telegraph 1.2s, cooldown 7-9s.
 
 ## Known limitations
