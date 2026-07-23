@@ -126,6 +126,11 @@ respect these unless Kevin explicitly changes them.
   `file://` era don't carry over.
 - Public/remote hosting (GitHub Pages, Tailscale) considered and deferred —
   local server is enough for now.
+- **LAN play (2026-07-22, Kevin)**: server binds 0.0.0.0 so other devices on
+  the home network can open the game; console prints the LAN URL. The host
+  computer still opens 127.0.0.1 so ITS leaderboard origin never changes;
+  each device has its own localStorage scores. Still fully local — nothing
+  leaves the network.
 - **No build step remains sacred**: plain files served as-is,
   edit-and-refresh. Multi-file and local assets are allowed but not required;
   procedural-in-code stays the default aesthetic and workflow.

@@ -12,6 +12,10 @@ Extras:
 - Fixed port 8765 so the browser origin (and the localStorage leaderboard)
   stays the same every time. Re-running while the server is up just opens
   another browser tab.
+- Listens on 0.0.0.0, so other devices on your network can play too — the
+  console prints the LAN address to type into their browser. (This computer
+  still opens 127.0.0.1 so its leaderboard origin never changes; every
+  device keeps its own localStorage scores.)
 - Live reload: the server watches the game files (html, css/, js/) and the
   page auto-refreshes when any of them change. If a game is in progress
   (window.running), the refresh politely waits until you're back on the
@@ -84,6 +88,18 @@ def version_stamp():
         except OSError:
             pass
     return "%s:%d" % (newest, count)
+
+
+def lan_ip():
+    """Best-effort LAN address for the 'play from another device' hint."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))  # no traffic is actually sent
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
 
 
 def port_in_use(port):
@@ -174,12 +190,17 @@ def main():
     handler = functools.partial(Handler, directory=HERE)
     socketserver.ThreadingTCPServer.allow_reuse_address = True
     socketserver.ThreadingTCPServer.daemon_threads = True
-    httpd = socketserver.ThreadingTCPServer(("127.0.0.1", PORT), handler)
+    # 0.0.0.0: reachable from other devices on the local network. THIS
+    # computer still opens 127.0.0.1 so its leaderboard origin never changes.
+    httpd = socketserver.ThreadingTCPServer(("0.0.0.0", PORT), handler)
 
     print("=" * 46)
     print("   TOOT AND SCOOT is starting!  *pffffft*")
     print("=" * 46)
     print("Game: " + url)
+    ip = lan_ip()
+    if ip:
+        print("Other devices on your wifi: http://%s:%d/%s" % (ip, PORT, GAME))
     if args.boss:
         print("BOSS MODE: pick your start level on the main menu  *braaap*")
     elif args.level > 1:

@@ -7,7 +7,9 @@ Games designed by Otto, built with Claude.
 A 3D fart-battle arena game in a bathroom-themed maze. **To play:
 double-click `play.py`** — it starts a tiny local server and opens the game
 in your browser automatically (keep the console window open while playing;
-press ESC or close it to stop). It also live-reloads the page whenever a
+press ESC or close it to stop). Other devices on your wifi can play too —
+the console prints the address to type into their browser (each device
+keeps its own high scores; Windows Firewall may ask to allow Python once). It also live-reloads the page whenever a
 game file changes — waiting politely until you're back at the title screen
 if a match is running. Needs Python 3 installed, and internet the first time to
 load the Three.js library. Opening `toot-and-scoot.html` directly also still
