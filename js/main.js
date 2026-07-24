@@ -53,6 +53,13 @@ var resultsPending = false;
 var retryLevel = 0;
 var playerHat = 'cowboy';
 var numPlayers = 1, twoPlayer = false, player2 = null, player3 = null, round2p = 0;
+// co-op (team) mode: humans vs rivals together. `coop` is the setup-screen
+// choice; `coopActive` is the derived truth (coop AND multiplayer), recomputed
+// in startLevel — every co-op behavior gates on coopActive so a stale coop=true
+// can never leak into a 1P game. See DESIGN-DECISIONS "Co-op mode".
+var coop = false, coopActive = false;
+var COOP_REVIVE_SECS = 5;        // downed teammate's window to be reached
+var COOP_REVIVE_DIST = TS * 1.2; // how close an up teammate must get to revive
 // (startAtLevel / bossMode live in constants.js — parsed before ui.js builds
 // the title-menu rows; the boss-mode level picker row is revealed at the
 // bottom of this file with the other load-time side effects)
@@ -92,6 +99,7 @@ function humans() {
   if (twoPlayer && player3) h.push(player3);
   return h;
 }
+function isHuman(o) { return o === player || o === player2 || o === player3; }
 function nearestPlayerTile(gx, gz) {
   var best = null, bd = 1e9;
   humans().forEach(function (h) {
@@ -192,6 +200,7 @@ function startLevel(keepStats) {
   if (domes) domes.forEach(function (d) { scene.remove(d.mesh); });
   bombs = []; explosions = []; powerups = []; bots = []; walls = []; domes = [];
   twoPlayer = numPlayers >= 2;
+  coopActive = coop && twoPlayer;   // co-op rules only apply in multiplayer
   setAspects();
   applyTheme(themeForLevel(level));
   buildWorld();
@@ -457,6 +466,8 @@ function resetTransientUI() {
     p.blindTime = 0;
     p.reviveTime = 0;
     p.beansTime = 0;
+    p.downed = false;
+    p.downTime = 0;
     removeBlindCloud(p);
     if (p.maskTime > 0) {
       p.maskTime = 0;
@@ -1471,24 +1482,32 @@ function animate() {
     var frozen = countdownT > 0;
     if (frozen) updateCountdown(dt);
     // each human: controller (and keyboard for P1) drives movement, camera, and buttons
-    if (player.alive) {
+    // co-op downed players (alive but toppled) keep their camera on their own
+    // body — no control, no shake — so a teammate can be seen rushing in
+    if (player.alive && !player.downed) {
       if (!frozen) controlHuman(player, p1pad, true, dt);
       placeCam(camera, player, dt); applyShake(camera, player, dt);
+    } else if (player.downed) {
+      placeCam(camera, player, dt);
     } else if (twoPlayer) {
       spectate(player, p1pad, camera, dt);
     }
     if (twoPlayer && player2) {
-      if (player2.alive) {
+      if (player2.alive && !player2.downed) {
         if (!frozen) controlHuman(player2, p2pad, false, dt);
         placeCam(camera2, player2, dt); applyShake(camera2, player2, dt);
+      } else if (player2.downed) {
+        placeCam(camera2, player2, dt);
       } else {
         spectate(player2, p2pad, camera2, dt);
       }
     }
     if (twoPlayer && player3) {
-      if (player3.alive) {
+      if (player3.alive && !player3.downed) {
         if (!frozen) controlHuman(player3, p3pad, false, dt);
         placeCam(camera3, player3, dt); applyShake(camera3, player3, dt);
+      } else if (player3.downed) {
+        placeCam(camera3, player3, dt);
       } else {
         spectate(player3, p3pad, camera3, dt);
       }
@@ -1535,6 +1554,37 @@ function animate() {
       humans().forEach(function (p) {
         if (p.reviveTime > 0) p.reviveTime = Math.max(0, p.reviveTime - dt);
       });
+      // co-op: downed teammates count down; an UP teammate who reaches one in
+      // time (COOP_REVIVE_DIST) revives them with a brief invincible speed-boost
+      // escape (reused Extra-Life feel); running out drops them to spectator.
+      if (coopActive && !transitioning) {
+        var upTeam = humans().filter(function (h) { return h.alive && !h.downed; });
+        humans().forEach(function (p) {
+          if (!p.downed) return;
+          var saved = upTeam.some(function (h) {
+            return Math.hypot(h.x - p.x, h.z - p.z) < COOP_REVIVE_DIST;
+          });
+          if (saved) {
+            p.downed = false;
+            p.downTime = 0;
+            p.maskTime = Math.max(p.maskTime, 1.5);   // brief invuln so you don't instantly re-die
+            p.reviveTime = 2;                          // double-speed escape
+            p.suppress = true;                         // release buttons before acting again
+            showPMsg(p, 'Revived!', 'down');
+            snd(660, 0.12, 'sine'); snd(880, 0.16, 'sine');
+            return;
+          }
+          p.downTime -= dt;
+          if (p.downTime <= 0) {
+            // nobody made it in time — out for the rest of the round (spectate)
+            p.downed = false;
+            p.alive = false;
+            charSpin(p);
+            (function (deadP) { later(function () { scene.remove(deadP.mesh); }, 650); })(p);
+            showPMsg(p, 'Knocked out!', 'down');
+          }
+        });
+      }
       // bean power: leave a little fart on every tile you cross
       humans().forEach(function (p) {
         if (!p.alive || !(p.beansTime > 0)) return;
@@ -1719,11 +1769,15 @@ function animate() {
       // player hit?
       // did anyone get gassed?
       humans().forEach(function (p, hIdx) {
-        if (!p.alive || transitioning || p.maskTime > 0) return;
+        if (!p.alive || p.downed || transitioning || p.maskTime > 0) return;
         var t = tileOf(p);
         var hitBy = null;
         explosions.forEach(function (e2) { if (e2.gx === t.x && e2.gz === t.z) hitBy = e2; });
         if (hitBy) {
+          // co-op friendly fire is OFF: a TEAMMATE's fart can't hurt you (your
+          // own self-gas and rivals' blasts still do — the self-gas risk that
+          // balances Pyroflatulence stays).
+          if (coopActive && hitBy.owner && hitBy.owner !== p && isHuman(hitBy.owner)) return;
           if (p.lives > 0) {
             // the rainbow saves you: spend a life, flash invincible for 2 seconds
             // with bean-style double speed to escape the danger
@@ -1734,8 +1788,19 @@ function animate() {
             snd(784, 0.12, 'sine'); snd(523, 0.2, 'sine');
             return;
           }
-          p.alive = false;
           if (hitBy.owner === p) p.selfGas++;   // oops! gassed yourself
+          if (coopActive) {
+            // co-op: you don't go straight out — you go DOWN with a 5s window
+            // for a teammate to reach you. The mesh stays put so they can find
+            // you; the downTime countdown + revive live in the simulation block.
+            p.downed = true;
+            p.downTime = COOP_REVIVE_SECS;
+            charSpin(p);   // knockdown reaction (mesh is NOT removed while downed)
+            snd(140, 0.4, 'triangle');
+            showPMsg(p, 'DOWN! Teammate, revive me!', 'down');
+            return;
+          }
+          p.alive = false;
           if (twoPlayer) {
             // multiplayer only: knockout spin-out, removal delayed past the animation.
             // In 1P, death calls endGame (running=false + bumpSession) so no spin
@@ -1754,29 +1819,59 @@ function animate() {
         }
       });
       if (twoPlayer && !transitioning) {
-        // versus round: last one standing wins the level, then EVERYONE moves on together
-        var aliveH = humans().filter(function (p) { return p.alive; });
         var aliveBotCount = bots.filter(function (b) { return b.alive; }).length;
-        if (aliveH.length === 0) {
-          endGame('The rivals win! Press Start to play again');
-        } else if (aliveH.length === 1 && aliveBotCount === 0) {
-          transitioning = true;
-          var winner = aliveH[0];
-          winner.wins = (winner.wins || 0) + 1;
-          winner.score = (winner.score || 0) + 500;   // 500 point round-win bonus
-          if (winner.bestT === null || winner.bestT === undefined || levelTime < winner.bestT) winner.bestT = levelTime;
-          var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
-          showLevelMsg(wname + ' wins the round!');
-          snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
-          later(function () {             // session-guarded AND cleared on quit/endGame/startGame
-            if (!transitioning) return;   // belt-and-braces: player quit during the transition
-            level++;
-            startLevel(true);
-            showLevelMsg(isBossLevel(level)
-              ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
-              : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
-            transitioning = false;
-          }, 1700);
+        if (coopActive) {
+          // CO-OP: the team clears the level by wiping every rival together;
+          // survivors (up OR still-downed) advance and split the +500. The team
+          // only loses when nobody is still up to revive anyone.
+          var stillIn = humans().filter(function (p) { return p.alive; });      // up or downed
+          var upCount = humans().filter(function (p) { return p.alive && !p.downed; }).length;
+          if (bots.length && aliveBotCount === 0 && stillIn.length) {
+            transitioning = true;
+            stillIn.forEach(function (p) {
+              p.wins = (p.wins || 0) + 1;
+              p.score = (p.score || 0) + 500;
+              p.downed = false; p.downTime = 0;   // a downed survivor is safe the moment the level clears
+              if (p.bestT === null || p.bestT === undefined || levelTime < p.bestT) p.bestT = levelTime;
+            });
+            showLevelMsg('Level ' + level + ' cleared — teamwork! +500');
+            snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
+            later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+              if (!transitioning) return;   // belt-and-braces: player quit during the transition
+              level++;
+              startLevel(true);
+              showLevelMsg(isBossLevel(level)
+                ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+                : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+              transitioning = false;
+            }, 1700);
+          } else if (upCount === 0) {
+            endGame('The whole team is down! Press Start to play again');
+          }
+        } else {
+          // versus round: last one standing wins the level, then EVERYONE moves on together
+          var aliveH = humans().filter(function (p) { return p.alive; });
+          if (aliveH.length === 0) {
+            endGame('The rivals win! Press Start to play again');
+          } else if (aliveH.length === 1 && aliveBotCount === 0) {
+            transitioning = true;
+            var winner = aliveH[0];
+            winner.wins = (winner.wins || 0) + 1;
+            winner.score = (winner.score || 0) + 500;   // 500 point round-win bonus
+            if (winner.bestT === null || winner.bestT === undefined || levelTime < winner.bestT) winner.bestT = levelTime;
+            var wname = winner === player ? 'Player 1' : winner === player2 ? 'Player 2' : 'Player 3';
+            showLevelMsg(wname + ' wins the round!');
+            snd(520, 0.2, 'sine'); snd(780, 0.3, 'sine');
+            later(function () {             // session-guarded AND cleared on quit/endGame/startGame
+              if (!transitioning) return;   // belt-and-braces: player quit during the transition
+              level++;
+              startLevel(true);
+              showLevelMsg(isBossLevel(level)
+                ? 'Level ' + level + ': BOSS FIGHT — The Big Stinker!'
+                : 'Level ' + level + ': ' + currentMaze.name + ' — ' + SUPER_NAMES[player.superType] + '!');
+              transitioning = false;
+            }, 1700);
+          }
         }
       } else if (!twoPlayer) {
         // level cleared?

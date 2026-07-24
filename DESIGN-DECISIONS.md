@@ -103,6 +103,25 @@ respect these unless Kevin explicitly changes them.
   keyboard). Start is blocked until requirements are met.
 - Scoring works identically in multiplayer (plus 200 for gassing a player);
   the persistent leaderboard remains 1P-only.
+- **Co-op / Team mode (Otto, 2026-07-24)**: a "Team up?" toggle on the setup
+  screen (appears only for 2P/3P; joins the d-pad grid like the boss-mode
+  level picker) switches multiplayer between Free-for-all and Team co-op.
+  Free-for-all is preserved and stays the default. In co-op:
+  - **Win = clear every rival together** (boss on boss levels). Survivors —
+    up OR still-downed — each get +500 and a win tally; everyone advances.
+  - **Friendly fire is OFF**: a teammate's fart can't hurt you. Your OWN
+    self-gas and rivals' blasts still do (keeps the Pyroflatulence self-gas
+    counterweight; only teammate-on-teammate damage is removed).
+  - **Downed + revive**: a gassed teammate isn't out immediately — they go
+    DOWN for a **5-second** window (`COOP_REVIVE_SECS`). An up teammate who
+    reaches them (`COOP_REVIVE_DIST`, ~1.2 tiles) revives them with a brief
+    invincible double-speed escape (reuses the Extra-Life feel). Miss the
+    window → they spectate until the round ends. Kevin's chosen numbers.
+  - **Lose = nobody left up**: the team loses only when zero players are up
+    (a lone downed player with no possible reviver is an immediate loss —
+    no pointless wait). Implementation gates on `coopActive` (= `coop &&`
+    multiplayer), recomputed in `startLevel`, so co-op rules never leak into
+    a 1P game.
 
 ## UI decisions
 - Kart-racer style HUD: chunky outlined text, corner panels, A/X item boxes

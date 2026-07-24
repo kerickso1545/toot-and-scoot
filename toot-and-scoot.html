@@ -18,6 +18,13 @@
       <button class="hatbtn" id="modebtn2" onclick="pickMode(2, this, event)">2 players</button>
       <button class="hatbtn" id="modebtn3" onclick="pickMode(3, this, event)">3 players</button>
     </div>
+    <div id="teamrow" style="display:none">
+      <p style="margin:12px 0 2px">Team up?</p>
+      <div id="teambtns">
+        <button class="hatbtn hatsel" id="teambtn0" onclick="pickTeam(0, this, event)">Free-for-all</button>
+        <button class="hatbtn" id="teambtn1" onclick="pickTeam(1, this, event)">Team up!</button>
+      </div>
+    </div>
     <p style="margin:12px 0 2px">Pick your color:</p>
     <div id="colorbtns">
       <button class="hatbtn hatsel" onclick="pickColor(0x2979ff, this, event)" style="color:#64b5f6">Blue</button>

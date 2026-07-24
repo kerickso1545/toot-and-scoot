@@ -65,14 +65,18 @@ hsub lines); game info never lives inside a player tile.
 - World: `grid`, `crateMeshes`, `bombs`, `explosions`, `powerups`, `walls`
   (temp trap walls), `domes` (visual effects), `bots`, `levelSpawns`
 - Players: `player`, `player2`, `player3` (null when unused); `humans()`
-  returns the active list. Per-player fields: `x,z`, `yaw,pitch` (camera),
+  returns the active list; `isHuman(o)` tests owner identity (used by co-op
+  friendly-fire). Per-player fields: `x,z`, `yaw,pitch` (camera),
   `speed,maxBombs,range`, `held` (active item), `score,wins,lives`,
   `superType,superUsed,maskTime`, `beansTime,reviveTime,blindTime`,
+  `downed/downTime` (co-op: toppled, awaiting revive — see below),
   `stamina,exhausted`, `camDist` (camera collision), `suppress` +
   `prevBomb/prevUse/prevMask` (button edges), `spec/specName` (spectating)
 - Session: `running`, `gameOver`, `level`, `difficulty`, `numPlayers`,
-  `twoPlayer` (means "multiplayer", true for 2P AND 3P), `transitioning`,
-  `gameSession` + `pendingTimeouts` (see Safety rails)
+  `twoPlayer` (means "multiplayer", true for 2P AND 3P), `coop` (setup-screen
+  Team toggle) + `coopActive` (= `coop && twoPlayer`, recomputed in
+  `startLevel` — ALL co-op behavior gates on this so it can't leak into 1P),
+  `transitioning`, `gameSession` + `pendingTimeouts` (see Safety rails)
 - UI state: `menuOpen`, `rulesOpen`, `initialsActive`, `locked` (pointer lock),
   `padAssign` (controller-index assignment per match)
 
@@ -215,6 +219,21 @@ hsub lines); game info never lives inside a player tile.
   boss 100 per hit + 1000 kill. Credited to `explosion.owner.score` when the
   owner is a human (bots have no `score` field — guarded by
   `score !== undefined`).
+
+- **Co-op mode** (`coopActive`): all in `animate()`'s kill/win section +
+  the control dispatch, gated on `coopActive`. (1) Friendly fire OFF — the
+  player-hit loop early-returns when `hitBy.owner` is a DIFFERENT human
+  (`isHuman`); self-gas and rival blasts still land. (2) Downed state — a
+  gassed human sets `downed=true, downTime=COOP_REVIVE_SECS` and `charSpin`s
+  in place (mesh NOT removed) instead of going out; the control dispatch gives
+  a `downed` player camera-on-body (no `controlHuman`, no `spectate`), and the
+  hit loop skips `p.downed`. (3) Revive/expire — a per-frame block (by the
+  reviveTime timer): an up teammate within `COOP_REVIVE_DIST` clears `downed`
+  and grants a brief `maskTime`+`reviveTime` escape; `downTime<=0` drops them
+  to spectator (`alive=false`, delayed mesh removal). (4) Win/loss — team
+  clears the level when all bots dead and ≥1 human still in (up or downed),
+  splitting +500/wins across survivors; team loses only when zero humans are
+  up. `twoPHudHtml` shows a `DOWN! Revive: Ns` line while downed.
 
 ## Balance constants (top of script, easy to tune)
 

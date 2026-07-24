@@ -2,7 +2,28 @@ function pickMode(n, el, ev) {
   if (ev) ev.stopPropagation();
   numPlayers = n;
   for (var i = 1; i <= 3; i++) document.getElementById('modebtn' + i).classList.toggle('hatsel', n === i);
+  refreshTeamRow();
   updatePadStatus();
+}
+
+// Team/Free-for-all toggle: only meaningful with 2+ players, so the row
+// appears (and joins the d-pad grid) only in multiplayer — mirrors how boss
+// mode splices in the level picker.
+function pickTeam(v, el, ev) {
+  if (ev) ev.stopPropagation();
+  coop = !!v;
+  document.getElementById('teambtn0').classList.toggle('hatsel', !coop);
+  document.getElementById('teambtn1').classList.toggle('hatsel', coop);
+}
+function refreshTeamRow() {
+  var show = numPlayers >= 2;
+  document.getElementById('teamrow').style.display = show ? 'block' : 'none';
+  var idx = MENU_ROWS.indexOf('teambtns');
+  if (show && idx < 0) MENU_ROWS.splice(MENU_ROWS.indexOf('modebtns') + 1, 0, 'teambtns');
+  else if (!show && idx >= 0) MENU_ROWS.splice(idx, 1);
+  mRow = Math.min(mRow, MENU_ROWS.length - 1);
+  mCol = Math.min(mCol, titleButtons(MENU_ROWS[mRow]).length - 1);
+  renderTitleFocus();
 }
 
 var playerColor = 0x2979ff;
@@ -465,14 +486,15 @@ function twoPHudHtml(label, col, p) {
   // separate #hudGame tile — never inside a player tile.
   var item = p.held ? PU_NAME[p.held] : '—';
   var stCol = p.stamina > 40 ? '#66bb6a' : p.stamina > 15 ? '#fdd835' : '#e53935';
-  var stBar = p.alive
+  var stBar = (p.alive && !p.downed)
     ? '<div style="width:120px;height:8px;background:rgba(0,0,0,0.5);border:2px solid #fff;border-radius:5px;margin:4px auto;overflow:hidden">' +
       '<div style="height:100%;width:' + Math.round(p.stamina) + '%;background:' + stCol + '"></div></div>'
     : '';
   return '<div class="hlabel" style="color:' + col + '">' + label + '</div>' +
     '<div class="hbig">' + (p.score || 0) + '</div>' +
     '<div class="hsub" style="color:#ffd54f">Wins ' + (p.wins || 0) + '</div>' + stBar +
-    '<div class="hsub">' + (p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range + ' · Spd ' + p.speed.toFixed(1) +
+    '<div class="hsub">' + (p.downed ? '<span style="color:#ff5252">DOWN! Revive: ' + Math.ceil(p.downTime || 0) + 's</span>' :
+      p.alive ? 'Gas ' + p.maxBombs + ' · Blast ' + p.range + ' · Spd ' + p.speed.toFixed(1) +
       (p.lives > 0 ? ' · Lives ' + p.lives : '') +
       (p.beansTime > 0 ? ' · BEANS ' + Math.ceil(p.beansTime) + 's!' : '') :
       'KNOCKED OUT' + (p.specName ? ' — watching ' + p.specName : '') + ' (A = switch)') + '</div>' +

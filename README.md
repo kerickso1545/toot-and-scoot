@@ -27,9 +27,19 @@ still works to set a start level directly without the picker.
   persistent local leaderboard (top 10, classic 3-initial entry; every entry
   shows the difficulty it was earned on)
 - **2 player split screen** and **3 player quadrant view** (third-person
-  cameras; the 3P fourth quadrant is a live bird's-eye view) — battle royale
-  with rival bots mixed in; when someone wins the round, everyone advances to
-  the next level together; per-player win tally and score
+  cameras; the 3P fourth quadrant is a live bird's-eye view). Pick your style
+  with the **Team up?** toggle on the setup screen:
+  - **Free-for-all** (default) — battle royale, humans vs humans vs rivals;
+    last one standing wins the round (+500).
+  - **Team up! (co-op)** — you and your friends are on the same side against
+    the rivals. Your farts **can't hurt teammates** (rivals and your own
+    self-gas still can!). Clear every rival together to beat the level and
+    split the +500. If a teammate gets gassed they go **DOWN** with a
+    5-second timer — run to them to **revive** them (brief invincible
+    speed-boost to escape). Miss the window and they spectate until the round
+    ends. The team only loses when everyone is down at once.
+  - Either way, everyone advances to the next level together; per-player win
+    tally and score.
 - Knocked-out players **spectate** (A cycles who you watch)
 
 ### Controls
