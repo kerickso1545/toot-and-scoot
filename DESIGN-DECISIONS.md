@@ -130,6 +130,13 @@ respect these unless Kevin explicitly changes them.
   All rules live on the separate scrollable "How to play" panel. Keep it
   that way.
 - Old-school 3-initial leaderboard entry (d-pad cycles letters).
+- **Glossy "Lego City" popup styling (Kevin/Otto, 2026-07-24)**: the shared
+  `.menu` / `.mbtn` classes (pause, settings, results, rules, initials panels)
+  restyled from flat boxes to a console look — gradient navy panel with gold
+  trim, chunky 3D buttons (bottom-shadow "press", glossy top highlight),
+  gold ring + glow on the selected/focused button. Chosen over a Minecraft
+  stone-block look to match the game's existing kart-racer gold HUD. Pure CSS;
+  no markup or nav changes (still `.sel` for controller/keyboard focus).
 - Naming: "Air Freshener" (not air spray), "Extra Life" (not Extalife —
   a dictation artifact that got fixed), "Super Scoot", "Turbo Toot",
   "Silent But Deadly", "Dutch Oven", "The Big Stinker".
