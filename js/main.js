@@ -1078,6 +1078,39 @@ function usePowerupFor(p) {
 var locked = false;
 var keys = {};
 var padBombPrev = false, padStartPrev = false, padUsePrev = false;
+var padDebugOn = false;   // Controller Check overlay (toggle with C on the title screen)
+function renderPadDebug() {
+  var el = document.getElementById('paddebug');
+  if (!el) return;
+  var raw = navigator.getGamepads ? navigator.getGamepads() : [];
+  var visible = 0, lines = [];
+  for (var i = 0; i < raw.length; i++) {
+    var gp = raw[i];
+    if (!gp) continue;
+    visible++;
+    var pressed = [];
+    for (var b = 0; b < gp.buttons.length; b++) if (gp.buttons[b] && gp.buttons[b].pressed) pressed.push(b);
+    var ax = [];
+    for (var a = 0; a < gp.axes.length; a++) ax.push((gp.axes[a] || 0).toFixed(2));
+    lines.push('[' + gp.index + '] ' + (gp.connected ? 'ON ' : 'off') +
+      ' map:' + (gp.mapping || '?') +
+      '\n    ' + String(gp.id).slice(0, 40) +
+      '\n    buttons down: ' + (pressed.length ? pressed.join(' ') : '(none)') +
+      '\n    axes: ' + ax.join(' '));
+  }
+  var head = 'CONTROLLER CHECK  (press C to hide)\n' +
+    'Controllers the game can see: ' + visible + '\n';
+  if (!visible) {
+    head += '\nNONE yet. The browser hides a pad until you:\n' +
+      '  1) click THIS game window (not the black console)\n' +
+      '  2) press A / a button on the pad\n' +
+      'If a gamepad-tester site sees it but this stays 0,\n' +
+      'the game tab is not focused, or Steam grabbed the pad.';
+  } else {
+    head += 'Press buttons — "buttons down" should change.\n\n' + lines.join('\n\n');
+  }
+  el.textContent = head;
+}
 var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false, padLtPrev = false, padRtPrev = false;
 
 overlay.addEventListener('click', function () {
@@ -1143,6 +1176,14 @@ document.addEventListener('keydown', function (e) {
     return;
   }
   if ((!running || gameOver) && overlay.style.display !== 'none') {
+    // "C" toggles the Controller Check readout — shows live what the browser
+    // is actually handing the page, so a "connected but does nothing" pad can
+    // be told apart from a pad the browser never woke / never focused.
+    if (e.code === 'KeyC') {
+      padDebugOn = !padDebugOn;
+      document.getElementById('paddebug').style.display = padDebugOn ? 'block' : 'none';
+      return;
+    }
     if (e.code === 'ArrowUp') { titleNav(0, -1); return; }
     if (e.code === 'ArrowDown') { titleNav(0, 1); return; }
     if (e.code === 'ArrowLeft') { titleNav(-1, 0); return; }
@@ -1403,6 +1444,7 @@ function animate() {
   var pad = null, p1pad = null, p2pad = null, p3pad = null;
   var cps = connectedPads();
   pad = cps[0] || null;
+  if (padDebugOn) renderPadDebug();
   if (running && !gameOver && padAssign) {
     // a vanished assigned controller ALWAYS pauses the game with a message naming
     // which player lost it (checked BEFORE reclaiming a replacement pad)
