@@ -82,31 +82,54 @@
     box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.35), 0 6px 0 var(--ink), inset 0 2px 0 var(--gloss);
     transform: translateY(-2px) scale(1.05);
   }
-  #gametyperow { margin: 4px 0 2px; }
-  /* ---- player-join slot tiles ---- */
+  /* ---- shared Mode / Difficulty rows ---- */
+  .setup-shared { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
+  .shared-label { font-family: var(--type-display); font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
+  #gametyperow, #diffrow { display: inline-flex; gap: 4px; }
+  .diffbtn.diffsel {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #5a83ff 0%, #274bc4 100%);
+    box-shadow: 0 4px 0 var(--brick-blue-lo), 0 0 0 3px rgba(255, 213, 79, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  }
+  /* ---- player-join / character-select cards ---- */
   #playerslots {
-    display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 4px 0 2px;
+    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 6px 0 4px;
   }
-  .pslot {
-    width: 150px; min-height: 92px; border-radius: 16px; cursor: pointer; color: #fff;
-    border: 4px solid var(--ink); padding: 8px 6px; font-family: var(--type-display);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  .pcard {
+    width: 210px; min-height: 132px; border-radius: 16px; color: #fff;
+    border: 4px solid var(--ink); padding: 8px 8px 10px; font-family: var(--type-display);
+    background: linear-gradient(180deg, #2b3566 0%, #1a2246 100%);
     box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 var(--gloss);
-    transition: transform var(--t-fast) var(--ease-spring), filter var(--t-fast) ease;
+    display: flex; flex-direction: column; gap: 6px; align-items: stretch;
   }
-  .pslot:hover { transform: translateY(-2px) scale(1.03); filter: brightness(1.08); }
-  .pslot.empty { background: linear-gradient(180deg, #3b4a2e 0%, #2a3720 100%); border-style: dashed; opacity: 0.92; }
-  .pslot.kb { background: linear-gradient(180deg, #4a4360 0%, #342c47 100%); }
-  .pslot.waiting { background: linear-gradient(180deg, var(--brick-yellow) 0%, var(--brick-yellow-lo) 100%); color: var(--ink); animation: slotpulse 0.9s ease-in-out infinite; }
-  .pslot.claimed { background: linear-gradient(180deg, var(--brick-green) 0%, var(--brick-green-lo) 100%); }
-  .pslot-plus { font-size: 34px; line-height: 1; }
-  .pslot-num { font-size: 18px; letter-spacing: 1px; text-shadow: 0 2px 0 var(--ink); }
-  .pslot-dev { font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; }
-  .pslot-x { font-size: 11px; font-family: Arial, sans-serif; opacity: 0.85; margin-top: 2px; }
-  @keyframes slotpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .pcard.ready { box-shadow: 0 5px 0 var(--ink), 0 0 0 4px rgba(87, 185, 58, 0.75), inset 0 2px 0 var(--gloss); }
+  .pcard-top { display: flex; justify-content: space-between; align-items: center; }
+  .pcard-num { font-size: 16px; text-shadow: 0 2px 0 var(--ink); }
+  .pcard-dev { font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #b9c4e6; }
+  .pcard-persona { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .pcard-arrow {
+    font-size: 16px; color: #fff; background: #3a4570; border: 2px solid var(--ink);
+    border-radius: 8px; cursor: pointer; width: 30px; height: 30px; line-height: 1; flex: none;
+  }
+  .pcard-arrow[disabled] { opacity: 0.35; cursor: default; }
+  .pcard-swatch { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; display: inline-block; flex: none; }
+  .pcard-name { font-size: 14px; flex: 1; text-align: center; }
+  .pcard-ready {
+    font-family: var(--type-display); font-size: 15px; color: #fff; cursor: pointer;
+    border: 3px solid var(--ink); border-radius: 10px; padding: 7px;
+    background: linear-gradient(180deg, #5a83ff 0%, #274bc4 100%); box-shadow: 0 3px 0 var(--ink);
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.45);
+  }
+  .pcard.ready .pcard-ready { background: linear-gradient(180deg, var(--brick-green) 0%, var(--brick-green-lo) 100%); }
+  .pcard-leave { font-family: Arial, sans-serif; font-size: 12px; color: #cfd8ff; background: none; border: none; cursor: pointer; }
+  .pcard.join, .pcard.kbjoin {
+    justify-content: center; align-items: center; border-style: dashed;
+    background: linear-gradient(180deg, #33405f 0%, #232d47 100%); text-align: center;
+  }
+  .pcard.kbjoin { cursor: pointer; }
+  .pcard-plus { font-size: 36px; line-height: 1; }
   @media (prefers-reduced-motion: reduce) {
-    .pslot.waiting { animation: none; }
-    .btn, .hatbtn, .brick-btn, .pslot { transition: none; }
+    .btn, .hatbtn, .brick-btn, .pcard-arrow { transition: none; }
     #overlay h1 { transform: rotate(0deg); }
   }
   .initbox {

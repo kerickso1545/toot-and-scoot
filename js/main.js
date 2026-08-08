@@ -1132,24 +1132,18 @@ var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false,
 var padJoinPrev = {};   // per-pad {s,e} edge state for the title-screen join scan
 var titleReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-overlay.addEventListener('click', function () {
-  if (running && !gameOver) return;                 // bubbled click from a start button that already began the game
-  if (!canStartGame()) { flashStartHint(); return; }
-  renderer.domElement.requestPointerLock();
-});
+// Clicking the title backdrop no longer starts a game — the lobby's ready-up
+// does (each player readies on their card; the last ready launches). Left as a
+// no-op so a stray backdrop click is harmless.
+overlay.addEventListener('click', function () {});
 document.addEventListener('pointerlockchange', function () {
   locked = document.pointerLockElement === renderer.domElement;
   if (locked) {
     if (running && !gameOver) {
       overlay.style.display = 'none';
       closeMenus();
-    } else if (canStartGame()) {
-      startGame();
-      overlay.style.display = 'none';
-      closeMenus();
     } else {
-      // a modal (rules / initials / pause) is open or controllers are missing:
-      // gaining pointer lock must NOT start a game
+      // gaining pointer lock outside a running game must NOT start one
       document.exitPointerLock();
     }
   } else {
@@ -1207,11 +1201,15 @@ document.addEventListener('keydown', function (e) {
       document.getElementById('paddebug').style.display = padDebugOn ? 'block' : 'none';
       return;
     }
-    if (e.code === 'ArrowUp') { titleNav(0, -1); return; }
-    if (e.code === 'ArrowDown') { titleNav(0, 1); return; }
-    if (e.code === 'ArrowLeft') { titleNav(-1, 0); return; }
-    if (e.code === 'ArrowRight') { titleNav(1, 0); return; }
-    if (e.code === 'Enter') { titleActivate(); return; }
+    // Keyboard drives the keyboard player's lobby card (arrows pick character,
+    // Enter readies). With no keyboard player yet, Enter joins one as P1.
+    var kbi = slotOfKb();
+    if (kbi < 0) { if (e.code === 'Enter') joinKeyboard(); return; }
+    if (e.code === 'ArrowLeft') cyclePersona(kbi, -1);
+    else if (e.code === 'ArrowRight') cyclePersona(kbi, 1);
+    else if (e.code === 'Enter') toggleReady(kbi);
+    else if (e.code === 'Backspace' || e.code === 'Escape') leaveSlot(kbi);
+    return;
   }
   if (menuOpen) {
     var btns = menuButtons();
@@ -1236,6 +1234,7 @@ document.addEventListener('mousedown', function () { if (locked) dropBombFor(pla
 
 function endGame(text) {
   gameOver = true; running = false; transitioning = false;
+  resetReady();                // returning to the lobby afterward: players re-ready to start again
   bumpSession();               // cancels pending transitions; new session for our own delay below
   closeMenus();
   padDiscMsg = '';
@@ -1492,37 +1491,50 @@ function animate() {
   }
   // keep the setup screen's controller status + start-button state fresh
   if ((!running || gameOver) && overlay.style.display !== 'none') updatePadStatus();
-  // --- title-screen player join. Snapshot which pad indices are ALREADY players
-  // at the start of this frame: a single A-press then does exactly one thing —
-  // JOIN (pad was unassigned) or menu-activate (pad was already a player, handled
-  // in the title branch below). "A" is read as south OR east because the bottom-
-  // vs-right A/B letters differ between Xbox and Switch pads, so pressing A works
-  // on either brand. Runs across ALL pads so each controller joins itself. ---
+  // --- title-screen lobby input. assignedStart maps a pad index to its slot
+  // number at the START of this frame, so one press does exactly one thing.
+  // Each connected pad either JOINS (if not a player yet — any face button) or
+  // drives ITS OWN card: L/R pick character, face = READY, View/"−" = leave.
+  // Player 1's pad also hosts the shared settings: LB = difficulty, RB = mode,
+  // + = controller help, Up = how to play. Runs across ALL pads. ---
   var assignedStart = {};
-  session.slots.forEach(function (s) { if (s.kind === 'pad') assignedStart[s.padIndex] = true; });
+  session.slots.forEach(function (s, i) { if (s.kind === 'pad') assignedStart[s.padIndex] = i; });
   var titleActive = (!running || gameOver) && overlay.style.display !== 'none' &&
       !rulesOpen && !helpOpen && !initialsActive && !resultsActive && !menuOpen;
   if (titleActive) {
     cps.forEach(function (np) {
-      var aBtn = Input.button(np, 0) || Input.button(np, 1);
-      var ps = padJoinPrev[np.index] || { a: false };
-      if (aBtn && !ps.a && !assignedStart[np.index] && session.slots.length < MAX_SLOTS) claimSlot('pad', np.index);
-      padJoinPrev[np.index] = { a: aBtn };
+      if (running && !gameOver) return;   // a ready press this frame already started the game
+      var pv = padJoinPrev[np.index] || {};
+      var face = Input.button(np, 0) || Input.button(np, 1) || Input.button(np, 2) || Input.button(np, 3);
+      var left = Input.button(np, 14) || np.axes[0] < -0.5;
+      var right = Input.button(np, 15) || np.axes[0] > 0.5;
+      var up = Input.button(np, 12) || np.axes[1] < -0.5;
+      var view = Input.button(np, 8);
+      var lb = Input.button(np, 4), rb = Input.button(np, 5), menu = Input.button(np, 9);
+      var si = assignedStart[np.index];
+      if (si === undefined) {
+        if (face && !pv.face && session.slots.length < MAX_SLOTS) claimSlot('pad', np.index);
+      } else {
+        if (left && !pv.left) cyclePersona(si, -1);
+        if (right && !pv.right) cyclePersona(si, 1);
+        if (face && !pv.face) toggleReady(si);
+        if (view && !pv.view) leaveSlot(si);
+        if (si === 0) {   // Player 1 hosts the shared settings
+          if (lb && !pv.lb) cycleDifficulty(1);
+          if (rb && !pv.rb) pickGameType(coop ? 'ffa' : 'coop');
+          if (menu && !pv.menu) openHelp();
+          if (up && !pv.up) showRules();
+        }
+      }
+      padJoinPrev[np.index] = { face: face, left: left, right: right, up: up, view: view, lb: lb, rb: rb, menu: menu };
     });
   }
   if (pad) {
-    // + button: start from the title, or open/close the pause menu in-game
+    // + (Menu) button: pause / resume in-game. On the title it's handled per-card
+    // above (Player 1 opens the controller help), so nothing to do here.
     var plus = pad.buttons[9] && pad.buttons[9].pressed;
     if (plus && !padStartPrev) {
-      if (!running || gameOver) {
-        // resultsPending: inside endGame's 600ms window the modals aren't up
-        // yet, so canStartGame() alone would let Start eat the results screen
-        // (and a qualifying high score) — hold Start until the panel shows
-        if (canStartGame() && !resultsPending) startGame();
-        else if (!initialsActive && !resultsActive && !rulesOpen && !helpOpen && !menuOpen && !resultsPending) flashStartHint();
-      }
-      else if (menuOpen) menuAction('resume', true);
-      else openMenu();
+      if (running && !gameOver) { if (menuOpen) menuAction('resume', true); else openMenu(); }
     }
     padStartPrev = plus;
 
@@ -1550,17 +1562,9 @@ function animate() {
     } else if (rulesOpen) {
       if (aNow && !padAPrev) hideRules();
     } else if (helpOpen) {
-      if (aNow && !padAPrev) closeHelp();   // south/East closes the Help Panel (also Esc + on-screen X)
-    } else if (!running || gameOver) {
-      if (upNow && !padUpPrev) titleNav(0, -1);
-      if (dnNow && !padDnPrev) titleNav(0, 1);
-      if (ltNow && !padLtPrev) titleNav(-1, 0);
-      if (rtNow && !padRtPrev) titleNav(1, 0);
-      // activate ONLY for a pad that was already a player at frame start — an
-      // unassigned pad's A is a JOIN (handled above), never a menu activate, so
-      // the join press can't also fire a menu button
-      if (aNow && !padAPrev && pad && assignedStart[pad.index]) titleActivate();
+      if (aNow && !padAPrev) closeHelp();   // any face button closes the Help Panel (also Esc + on-screen X)
     }
+    // (title-screen lobby input is handled per-card above, not here)
     padUpPrev = upNow; padDnPrev = dnNow; padAPrev = aNow; padLtPrev = ltNow; padRtPrev = rtNow;
   }
 

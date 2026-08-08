@@ -75,26 +75,88 @@ function joinKeyboard(ev) {
   if (ev) ev.stopPropagation();
   claimSlot('kb');
 }
+function hexCss(h) { return '#' + ('00000' + h.toString(16)).slice(-6); }
+function padTypeLabel(slot) {
+  if (slot.kind === 'kb') return '⌨ Keyboard';
+  var np = padByIndex(slot.padIndex);
+  var t = np ? np.type : 'xbox';
+  return '🎮 ' + (t === 'nintendo' ? 'Switch' : 'Xbox') + ' ' + (slot.padIndex + 1) + (np ? '' : ' (off)');
+}
+// Change a player's character (skips characters another player already took).
+// Locked once that player is READY (they must un-ready to change).
+function cyclePersona(i, dir) {
+  var s = session.slots[i];
+  if (!s || s.ready) return;
+  var p = s.persona;
+  for (var k = 0; k < PERSONAS.length; k++) {
+    p = (p + dir + PERSONAS.length) % PERSONAS.length;
+    if (!personaTakenBy(p, i)) { s.persona = p; break; }
+  }
+  snd(520, 0.06, 'sine');
+  renderSlots();
+}
+// requestPointerLock throws synchronously in some contexts and returns a
+// rejecting Promise in newer Chrome — swallow both so a failed lock (e.g. no
+// user gesture) never spams the console.
+function lockPointer() {
+  try {
+    var p = renderer.domElement.requestPointerLock();
+    if (p && p.catch) p.catch(function () {});
+  } catch (e) {}
+}
+function allReady() {
+  return session.slots.length > 0 && session.slots.every(function (s) { return s.ready; });
+}
+// Clear ready flags when a match ends so the lobby doesn't show everyone READY
+// (which would look startable but never auto-start — auto-start only fires on a
+// fresh ready press). Personas/claims are kept so the group stays intact.
+function resetReady() {
+  session.slots.forEach(function (s) { s.ready = false; });
+}
+function toggleReady(i) {
+  var s = session.slots[i];
+  if (!s) return;
+  s.ready = !s.ready;
+  snd(s.ready ? 820 : 300, 0.1, 'sine');
+  renderSlots();
+  // Everyone ready -> GO. Start synchronously in the triggering handler so the
+  // keyboard/mouse gesture can grab pointer lock (needed for a keyboard player's
+  // mouse-look and, when no pad is present, for the control loop to run at all).
+  // Gamepad players don't need lock — their pad drives control regardless.
+  if (s.ready && allReady() && canStartGame()) {
+    snd(660, 0.1, 'sine'); snd(990, 0.16, 'sine');
+    startGame();
+    lockPointer();
+  }
+}
 function renderSlots() {
   var host = document.getElementById('playerslots');
   if (!host) return;
   var html = '';
   session.slots.forEach(function (s, i) {
-    html += '<button class="pslot claimed" onclick="leaveSlot(' + i + ');event.stopPropagation();" title="Leave">' +
-      '<div class="pslot-num">Player ' + (i + 1) + '</div>' +
-      '<div class="pslot-dev">' + slotDeviceLabel(s) + '</div>' +
-      '<div class="pslot-x">✕ leave</div></button>';
+    var pr = PERSONAS[s.persona];
+    var col = hexCss(pr.color);
+    var ro = s.ready ? ' disabled' : '';
+    html += '<div class="pcard' + (s.ready ? ' ready' : '') + '" style="border-color:' + col + '">' +
+      '<div class="pcard-top"><span class="pcard-num" style="color:' + col + '">Player ' + (i + 1) + '</span>' +
+      '<span class="pcard-dev">' + padTypeLabel(s) + '</span></div>' +
+      '<div class="pcard-persona">' +
+        '<button class="pcard-arrow" onclick="cyclePersona(' + i + ',-1);event.stopPropagation();"' + ro + '>&#9664;</button>' +
+        '<span class="pcard-swatch" style="background:' + col + '"></span>' +
+        '<span class="pcard-name">' + pr.name + '</span>' +
+        '<button class="pcard-arrow" onclick="cyclePersona(' + i + ',1);event.stopPropagation();"' + ro + '>&#9654;</button>' +
+      '</div>' +
+      '<button class="pcard-ready" onclick="toggleReady(' + i + ');event.stopPropagation();">' +
+        (s.ready ? '&#10003; READY!' : 'Press to READY') + '</button>' +
+      '<button class="pcard-leave" onclick="leaveSlot(' + i + ');event.stopPropagation();">&#10005; leave</button>' +
+      '</div>';
   });
   if (session.slots.length < MAX_SLOTS) {
-    // instructional "press A on a controller to join" tile (clicking it is a
-    // no-op — joining is done by pressing a controller button, not the mouse)
-    html += '<button class="pslot empty" onclick="event.stopPropagation()">' +
-      '<div class="pslot-plus">+</div>' +
-      '<div class="pslot-dev">Press <b>A</b> on a<br>controller to join</div></button>';
+    html += '<div class="pcard join"><div class="pcard-plus">+</div>' +
+      '<div class="pcard-dev">Press a face button<br>on a controller to join</div></div>';
     if (session.slots.length === 0) {
-      html += '<button class="pslot kb" onclick="joinKeyboard(event)">' +
-        '<div class="pslot-plus">⌨</div>' +
-        '<div class="pslot-dev">Play with<br>keyboard</div></button>';
+      html += '<button class="pcard kbjoin" onclick="joinKeyboard(event)">' +
+        '<div class="pcard-plus">&#9000;</div><div class="pcard-dev">Play with<br>keyboard</div></button>';
     }
   }
   host.innerHTML = html;
@@ -102,9 +164,12 @@ function renderSlots() {
   numPlayers = Math.max(1, session.slots.length);
   var hint = document.getElementById('joinhint');
   if (hint) hint.style.display = session.slots.length ? 'none' : 'block';
-  mCol = Math.min(mCol, Math.max(0, titleButtons(MENU_ROWS[mRow]).length - 1));
-  renderTitleFocus();
+  refreshSharedSelected();
   updatePadStatus();
+}
+function slotOfKb() {
+  for (var i = 0; i < session.slots.length; i++) if (session.slots[i].kind === 'kb') return i;
+  return -1;
 }
 
 // Game type: Versus (free-for-all) vs Co-op team. Independent of player count;
@@ -113,17 +178,20 @@ function pickGameType(gt, ev) {
   if (ev) ev.stopPropagation();
   session.gameType = gt;
   coop = (gt === 'coop');
-  document.getElementById('gtffa').classList.toggle('gtsel', !coop);
-  document.getElementById('gtcoop').classList.toggle('gtsel', coop);
+  refreshSharedSelected();
 }
-
-var playerColor = 0x2979ff;
-function pickColor(hex, el, ev) {
+// Difficulty is now a SELECTION (not the start trigger — ready-up starts).
+function pickDifficulty(d, ev) {
   if (ev) ev.stopPropagation();
-  playerColor = hex;
-  var cb = document.querySelectorAll('#colorbtns .hatbtn');
-  for (var i = 0; i < cb.length; i++) cb[i].classList.remove('hatsel');
-  el.classList.add('hatsel');
+  difficulty = d;
+  refreshSharedSelected();
+}
+function cycleDifficulty(dir) { pickDifficulty((difficulty + dir + 3) % 3); snd(520, 0.06, 'sine'); }
+function refreshSharedSelected() {
+  var g0 = document.getElementById('gtffa'), g1 = document.getElementById('gtcoop');
+  if (g0 && g1) { g0.classList.toggle('gtsel', !coop); g1.classList.toggle('gtsel', coop); }
+  var db = document.querySelectorAll('#diffrow .diffbtn');
+  for (var i = 0; i < db.length; i++) db[i].classList.toggle('diffsel', i === difficulty);
 }
 
 // ---- rules panel ----
@@ -139,38 +207,17 @@ function hideRules(ev) {
   document.getElementById('rulespanel').style.display = 'none';
 }
 
-// ---- title menu controller navigation ----
-var MENU_ROWS = ['playerslots', 'gametyperow', 'colorbtns', 'hatbtns', 'startbtns', 'rulesrow'];
-// boss mode (play.py --boss): a start-level picker row joins the menu grid,
-// fully d-pad navigable like every other row
-if (bossMode) MENU_ROWS.splice(MENU_ROWS.indexOf('startbtns'), 0, 'levelbtns');
-var mRow = MENU_ROWS.indexOf('startbtns'), mCol = 0;
+// ---- title screen ----
+// The old single-cursor menu grid is gone: the lobby uses per-player cards, each
+// driven by that player's OWN controller (persona L/R, face = ready, View =
+// leave; P1 shoulders set difficulty/mode). renderTitleFocus() is kept as an
+// alias so the many "refresh the title" callers still work — it just re-renders
+// the lobby (which also refreshes the shared Mode/Difficulty selection).
 function titleButtons(rid) {
   var el = document.getElementById(rid);
   return el ? Array.prototype.slice.call(el.querySelectorAll('button')) : [];
 }
-function renderTitleFocus() {
-  MENU_ROWS.forEach(function (rid, ri) {
-    titleButtons(rid).forEach(function (b, ci) {
-      b.classList.toggle('focus', ri === mRow && ci === mCol);
-    });
-  });
-}
-function titleNav(dx, dy) {
-  if (dy) {
-    mRow = (mRow + dy + MENU_ROWS.length) % MENU_ROWS.length;
-    mCol = Math.min(mCol, titleButtons(MENU_ROWS[mRow]).length - 1);
-  }
-  if (dx) {
-    var n = titleButtons(MENU_ROWS[mRow]).length;
-    mCol = (mCol + dx + n) % n;
-  }
-  renderTitleFocus();
-}
-function titleActivate() {
-  var b = titleButtons(MENU_ROWS[mRow])[mCol];
-  if (b) b.click();
-}
+function renderTitleFocus() { renderSlots(); }
 
 // ---- persistent leaderboard (browser local storage) ----
 var initialsActive = false, initLetters = ['A', 'A', 'A'], initSlot = 0, pendingScore = null;
@@ -336,7 +383,7 @@ function resultsAction(act) {
     }
     hideResults();
     startGame(true);   // retry continues from the level you died on
-    try { renderer.domElement.requestPointerLock(); } catch (e) {}
+    lockPointer();
   } else {
     // 'setup' and 'menu' both land on the title screen (it IS the setup screen)
     hideResults();
@@ -432,50 +479,29 @@ var lastPadStatusHtml = null;
 function updatePadStatus() {
   var el = document.getElementById('padstatus');
   if (!el) return;
-  var s = session.slots, ready = controllersReady();
+  var s = session.slots;
   var lines = [];
   if (!s.length) {
     var nPads = connectedPads().length;
-    lines.push(nPads ? 'Solo: controller or keyboard — press A on a controller to add players'
-                     : 'Solo: keyboard + mouse — connect a controller to add players');
+    lines.push(nPads ? (nPads + ' controller' + (nPads === 1 ? '' : 's') + ' detected — press a face button to join')
+                     : 'No controllers detected — connect one, or play solo with the keyboard');
   } else {
+    var readyN = s.filter(function (x) { return x.ready; }).length;
+    var parts = [readyN + ' / ' + s.length + ' ready'];
     s.forEach(function (slot, i) {
-      var ok = slot.kind === 'kb' || padByIndex(slot.padIndex);
-      lines.push('P' + (i + 1) + ': ' + slotDeviceLabel(slot) +
-        (ok ? '' : ' <span style="color:#ef9a9a">(disconnected!)</span>'));
+      if (!(slot.kind === 'kb' || padByIndex(slot.padIndex))) {
+        parts.push('<span style="color:#ef9a9a">P' + (i + 1) + ' controller disconnected</span>');
+      }
     });
+    lines.push(parts.join(' &middot; '));
   }
-  var html = lines.join(' &middot; ') +
-    (ready ? '' : '<br><span style="color:#ffd54f">Reconnect the controller to start</span>');
-  if (html !== lastPadStatusHtml) {
-    lastPadStatusHtml = html;
-    el.innerHTML = html;
-    titleButtons('startbtns').forEach(function (b) {
-      b.style.opacity = ready ? '1' : '0.4';
-      b.style.cursor = ready ? 'pointer' : 'not-allowed';
-    });
-  }
-}
-function flashStartHint() {
-  var el = document.getElementById('padstatus');
-  if (el) {
-    el.style.outline = '3px solid #ff8a65';
-    setTimeout(function () { el.style.outline = 'none'; }, 900);
-  }
-  snd(140, 0.2, 'square');
+  var html = lines.join(' &middot; ');
+  if (html !== lastPadStatusHtml) { lastPadStatusHtml = html; el.innerHTML = html; }
 }
 // the ONE gate every start path must pass through
 function canStartGame() {
   return (!running || gameOver) && !initialsActive && !resultsActive && !rulesOpen &&
          !(typeof helpOpen !== 'undefined' && helpOpen) && !menuOpen && controllersReady();
-}
-
-function pickDiff(d, ev) {
-  if (ev) ev.stopPropagation();
-  if (!canStartGame()) { flashStartHint(); return; }
-  difficulty = d;
-  startGame();
-  try { renderer.domElement.requestPointerLock(); } catch (e) {}
 }
 
 function menuButtons() {
@@ -510,7 +536,7 @@ function menuAction(act, fromPad) {
     // suppress-until-released: every action button must be seen RELEASED
     // before any press can fire again (see controlHuman / spectate)
     humans().forEach(function (h) { h.suppress = true; h.prevBomb = true; h.prevUse = true; h.prevMask = true; });
-    if (!fromPad) renderer.domElement.requestPointerLock();
+    if (!fromPad) lockPointer();
   } else if (act === 'settings') { menuScreen = 'settings'; menuIndex = 0; renderMenu(); }
   else if (act === 'back') { menuScreen = 'pause'; menuIndex = 1; renderMenu(); }
   else if (act === 'quit') {
@@ -518,6 +544,7 @@ function menuAction(act, fromPad) {
     bumpSession();                       // cancels any pending level-clear transition
     running = false; gameOver = true; transitioning = false;
     padDiscMsg = '';
+    resetReady();                        // back to the lobby: players re-ready to start again
     resetTransientUI();
     hudroot.style.display = 'none';
     bigmsg.textContent = '';
