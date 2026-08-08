@@ -282,19 +282,13 @@ var settingsEl = document.getElementById('settingsmenu');
 // P2 / P3 require a controller each.
 var padAssign = null;        // { p1: index|-1(keyboard), p2: index|null, p3: index|null }
 var padDiscMsg = '';
-function connectedPads() {
-  var out = [];
-  if (navigator.getGamepads) {
-    var pads = navigator.getGamepads();
-    for (var i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) out.push(pads[i]);
-  }
-  return out;
-}
-function padByIndex(i) {
-  if (i === null || i === undefined || i < 0 || !navigator.getGamepads) return null;
-  var p = navigator.getGamepads()[i];
-  return (p && p.connected) ? p : null;
-}
+// Both accessors return NORMALIZED pads (Input.normalize): standard-position
+// buttons/axes regardless of the physical brand, so a non-standard-mapping pad
+// (the reported Xbox-vs-Switch failure mode) reads correctly everywhere the
+// game already reads .buttons[i]/.axes[i]. Shape is otherwise unchanged
+// (.index/.id/.mapping/.connected all preserved).
+function connectedPads() { return Input.pads(); }
+function padByIndex(i) { return Input.byIndex(i); }
 function requiredPads() { return Math.max(0, numPlayers - 1); }
 function controllersReady() { return connectedPads().length >= requiredPads(); }
 function assignPads() {

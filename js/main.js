@@ -1092,11 +1092,19 @@ function renderPadDebug() {
     for (var b = 0; b < gp.buttons.length; b++) if (gp.buttons[b] && gp.buttons[b].pressed) pressed.push(b);
     var ax = [];
     for (var a = 0; a < gp.axes.length; a++) ax.push((gp.axes[a] || 0).toFixed(2));
+    // normalized view + which ACTIONS the current presses map to — this is the
+    // line that tells a "connected but does nothing" pad apart from a mapping
+    // mismatch (raw buttons light up but no action fires) vs a dead pad.
+    var np = Input.normalize(gp);
+    var acts = [];
+    ['fart', 'item', 'super', 'sprint', 'pause', 'navUp', 'navDown', 'navLeft', 'navRight']
+      .forEach(function (a) { if (Input.act[a](np)) acts.push(a); });
     lines.push('[' + gp.index + '] ' + (gp.connected ? 'ON ' : 'off') +
-      ' map:' + (gp.mapping || '?') +
-      '\n    ' + String(gp.id).slice(0, 40) +
-      '\n    buttons down: ' + (pressed.length ? pressed.join(' ') : '(none)') +
-      '\n    axes: ' + ax.join(' '));
+      ' map:' + (gp.mapping || '?') + '  type:' + np.type + (np.remapped ? ' (remapped)' : '') +
+      '\n    ' + String(gp.id).slice(0, 44) +
+      '\n    raw buttons down: ' + (pressed.length ? pressed.join(' ') : '(none)') +
+      '\n    axes: ' + ax.join(' ') +
+      '\n    ACTIONS firing: ' + (acts.length ? acts.join(' ') : '(none)'));
   }
   var head = 'CONTROLLER CHECK  (press C to hide)\n' +
     'Controllers the game can see: ' + visible + '\n';
