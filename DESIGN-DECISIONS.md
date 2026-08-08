@@ -11,8 +11,12 @@ respect these unless Kevin explicitly changes them.
   regal), Stinky Pete (brown cowboy, wet sputter), Windy Wendy (propeller,
   high whistly), Princess Poot (crown, dainty squeak), Gassy Gus (hard hat,
   deep rumble), Captain Cheeks (captain's cap, machine-gun putt-putt).
-- Player picks color (blue/red/teal/magenta) and hat (cowboy/party/ball
-  cap/TP roll) on the setup screen. P2 green, P3 magenta-or-orange, auto hats.
+- **Personas (2026-08-08)**: players no longer pick a color/hat — each player
+  picks one of the six named characters as their **persona** (its color, hat,
+  and fart voice). A persona a human takes is **removed from the enemy pool**
+  that match (you never fight your own character; enemies fill from the rest).
+  `PERSONAS` (constants.js) reuses the enemy colors. Replaces the old
+  color+hat pickers. See "Character-select lobby" under UI decisions.
 - Bathroom theme: porcelain tile walls, cylindrical TP-roll crates with dark
   cardboard tube on top, frosted-glass trap walls, steamy sky. Theme system
   (`applyTheme`) built for future per-level themes — a stated future wish.
@@ -129,6 +133,18 @@ respect these unless Kevin explicitly changes them.
 - Setup screen is COMPACT: pickers + difficulty + controller status only.
   All rules live on the separate scrollable "How to play" panel. Keep it
   that way.
+- **Character-select lobby (Mario-Kart style, 2026-08-08)**: replaces the old
+  single-cursor setup grid and the 1P/2P/3P mode select. Up to 3 player cards;
+  each joined player's OWN controller drives their card — L/R pick character,
+  any face button = READY, View/− = leave. Player 1's pad hosts the shared
+  settings (LB = difficulty, RB = Versus/Co-op, + = controller help, Up =
+  how-to-play). Keyboard drives the keyboard player's card; mouse works for
+  everything. Join is direct: an unassigned pad's face button joins the next
+  slot (claim order = player order). The match **auto-starts when every joined
+  player is READY** (started in the triggering gesture so pointer lock can be
+  grabbed). Difficulty is a selection, not the start trigger. Each card
+  auto-labels its own controller (Switch vs Xbox from the pad id). Ready flags
+  reset when a match ends so the lobby is re-startable.
 - Old-school 3-initial leaderboard entry (d-pad cycles letters).
 - **Glossy "Lego City" popup styling (Kevin/Otto, 2026-07-24)**: the shared
   `.menu` / `.mbtn` classes (pause, settings, results, rules, initials panels)
