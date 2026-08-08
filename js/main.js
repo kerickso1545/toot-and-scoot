@@ -429,6 +429,7 @@ function startGame(retry) {
   bumpSession();               // invalidate every delayed callback from the old game
   padDiscMsg = '';
   resultsPending = false;      // belt-and-braces: never leave the start gate stuck
+  numPlayers = Math.max(1, session.slots.length);   // claimed players (min 1 = solo keyboard)
   assignPads();                // lock controller assignments for this match
   // retry === true (results panel "Retry same setup"): continue from the level
   // you died on with fresh stats. Every other start begins at startAtLevel.
@@ -447,6 +448,7 @@ function resetTransientUI() {
   // safe to call any time: quit, endGame, and every startLevel go through here.
   endCountdown();
   hideResults();
+  if (typeof closeHelp === 'function') closeHelp();   // never leave the Help Panel open across a state change
   maskoverlay.style.display = 'none';
   maskoverlay.style.opacity = '1';
   for (var i = 0; i < 3; i++) {
@@ -1120,6 +1122,8 @@ function renderPadDebug() {
   el.textContent = head;
 }
 var padUpPrev = false, padDnPrev = false, padAPrev = false, padMaskPrev = false, padLtPrev = false, padRtPrev = false;
+var padJoinPrev = {};   // per-pad {s,e} edge state for the title-screen join scan
+var titleReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 overlay.addEventListener('click', function () {
   if (running && !gameOver) return;                 // bubbled click from a start button that already began the game
@@ -1181,6 +1185,10 @@ document.addEventListener('keydown', function (e) {
   }
   if (rulesOpen) {
     if (e.code === 'Enter' || e.code === 'Escape' || e.code === 'Backspace') hideRules();
+    return;
+  }
+  if (helpOpen) {
+    if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Backspace') closeHelp();
     return;
   }
   if ((!running || gameOver) && overlay.style.display !== 'none') {
@@ -1445,6 +1453,7 @@ function animate() {
   var now = performance.now();
   var dt = Math.min((now - last) / 1000, 0.05);
   last = now;
+  updateHelpHighlight();   // live controller highlight when the Help Panel is open (no-op otherwise)
 
   // gamepads: assignments were locked at match start (assignPads) and are read
   // back by index every frame — a mid-match connect/disconnect never reshuffles
@@ -1476,6 +1485,25 @@ function animate() {
   }
   // keep the setup screen's controller status + start-button state fresh
   if ((!running || gameOver) && overlay.style.display !== 'none') updatePadStatus();
+  // --- title-screen player join (runs across ALL pads, not just cps[0], so each
+  // controller can join itself): while a slot is armed, an UNASSIGNED pad's south
+  // button claims it (claim order = player order); East(B) cancels the wait or
+  // leaves an already-claimed slot. wasWaiting freezes the armed state for this
+  // frame so the same press can't both arm (via titleActivate) and claim. ---
+  var wasWaiting = session.waiting;
+  if ((!running || gameOver) && overlay.style.display !== 'none' &&
+      !rulesOpen && !helpOpen && !initialsActive && !resultsActive && !menuOpen) {
+    cps.forEach(function (np) {
+      var south = Input.button(np, 0), east = Input.button(np, 1);
+      var ps = padJoinPrev[np.index] || { s: false, e: false };
+      if (south && !ps.s && wasWaiting && session.waiting && !padIndexInUse(np.index)) claimSlot('pad', np.index);
+      if (east && !ps.e) {
+        if (session.waiting) { session.waiting = false; renderSlots(); }   // cancel the wait
+        else { var si = slotOfPad(np.index); if (si >= 0) leaveSlot(si); } // leave a claimed slot
+      }
+      padJoinPrev[np.index] = { s: south, e: east };
+    });
+  }
   if (pad) {
     // + button: start from the title, or open/close the pause menu in-game
     var plus = pad.buttons[9] && pad.buttons[9].pressed;
@@ -1485,7 +1513,7 @@ function animate() {
         // yet, so canStartGame() alone would let Start eat the results screen
         // (and a qualifying high score) — hold Start until the panel shows
         if (canStartGame() && !resultsPending) startGame();
-        else if (!initialsActive && !resultsActive && !rulesOpen && !menuOpen && !resultsPending) flashStartHint();
+        else if (!initialsActive && !resultsActive && !rulesOpen && !helpOpen && !menuOpen && !resultsPending) flashStartHint();
       }
       else if (menuOpen) menuAction('resume', true);
       else openMenu();
@@ -1515,14 +1543,31 @@ function animate() {
       if (aNow && !padAPrev) menuAction(mbtns[menuIndex].dataset.act, true);
     } else if (rulesOpen) {
       if (aNow && !padAPrev) hideRules();
+    } else if (helpOpen) {
+      if (aNow && !padAPrev) closeHelp();   // south/East closes the Help Panel (also Esc + on-screen X)
     } else if (!running || gameOver) {
       if (upNow && !padUpPrev) titleNav(0, -1);
       if (dnNow && !padDnPrev) titleNav(0, 1);
       if (ltNow && !padLtPrev) titleNav(-1, 0);
       if (rtNow && !padRtPrev) titleNav(1, 0);
-      if (aNow && !padAPrev) titleActivate();
+      // !wasWaiting: while a slot is armed, south is a CLAIM (handled above), not
+      // a menu activate — so arming and claiming never collide on one press
+      if (aNow && !padAPrev && !wasWaiting) titleActivate();
     }
     padUpPrev = upNow; padDnPrev = dnNow; padAPrev = aNow; padLtPrev = ltNow; padRtPrev = rtNow;
+  }
+
+  // ---- title-screen backdrop: slowly orbit the existing arena behind the menu
+  // (the scene already renders every frame; this just gives it gentle motion).
+  // Reuses the game's own art — no new assets. Respects reduced-motion by
+  // holding a fixed angle. Full-screen aspect regardless of claimed players. ----
+  if ((!running || gameOver) && overlay.style.display !== 'none') {
+    var cx = COLS * TS / 2, cz = ROWS * TS / 2;
+    var ang = titleReduceMotion ? 0.6 : now * 0.00012;
+    camera.position.set(cx + Math.cos(ang) * 26, 18, cz + Math.sin(ang) * 26);
+    camera.lookAt(cx, 2, cz);
+    var fullAsp = window.innerWidth / window.innerHeight;
+    if (Math.abs(camera.aspect - fullAsp) > 0.001) { camera.aspect = fullAsp; camera.updateProjectionMatrix(); }
   }
 
   if (running && !menuOpen && (locked || pad)) {
@@ -2104,10 +2149,9 @@ if (bossMode) {
   }
 }
 renderScoreboard();
-renderTitleFocus();
-updatePadStatus();
-window.addEventListener('gamepadconnected', function () { updatePadStatus(); });
-window.addEventListener('gamepaddisconnected', function () { updatePadStatus(); });
+renderSlots();               // build the player-join tiles (also renders focus + pad status)
+window.addEventListener('gamepadconnected', function () { renderSlots(); });
+window.addEventListener('gamepaddisconnected', function () { renderSlots(); });
 animate();
 
 window.addEventListener('resize', function () {

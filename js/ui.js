@@ -1,29 +1,100 @@
-function pickMode(n, el, ev) {
+// ---- player-slot join flow ----
+// Replaces the old 1P/2P/3P mode select. Up to MAX_SLOTS players; claim order
+// IS player order (first claim = Player 1). Game type (Versus / Co-op) is a
+// SEPARATE choice, independent of how many players join. The game engine reads
+// numPlayers / coop / padAssign exactly as before — this UI just populates them.
+var MAX_SLOTS = 3;   // engine supports 3 humans (player / player2 / player3)
+// session.slots[i] describes Player i+1: {kind:'pad', padIndex:n} or {kind:'kb'}.
+// Contiguous by construction (claim appends the next slot; leave splices+repacks).
+var session = { slots: [], waiting: false, gameType: 'ffa' };
+
+function claimedCount() { return session.slots.length; }
+function padIndexInUse(idx) {
+  return session.slots.some(function (s) { return s && s.kind === 'pad' && s.padIndex === idx; });
+}
+function slotOfPad(idx) {
+  for (var i = 0; i < session.slots.length; i++) {
+    if (session.slots[i] && session.slots[i].kind === 'pad' && session.slots[i].padIndex === idx) return i;
+  }
+  return -1;
+}
+function slotDeviceLabel(s) {
+  if (!s) return '';
+  return s.kind === 'kb' ? '⌨ Keyboard' : '🎮 Controller ' + (s.padIndex + 1);
+}
+// Claim the next open slot. kind 'pad' (padIndex) or 'kb' (keyboard, P1 only —
+// the engine only lets Player 1 fall back to keyboard).
+function claimSlot(kind, padIndex) {
+  if (session.slots.length >= MAX_SLOTS) return false;
+  if (kind === 'kb' && session.slots.length !== 0) return false;    // keyboard = P1 only
+  if (kind === 'pad' && padIndexInUse(padIndex)) return false;      // one slot per pad
+  session.slots.push(kind === 'kb' ? { kind: 'kb' } : { kind: 'pad', padIndex: padIndex });
+  session.waiting = false;
+  snd(660, 0.1, 'sine'); snd(880, 0.14, 'sine');
+  renderSlots();
+  return true;
+}
+function leaveSlot(i) {
+  if (i < 0 || i >= session.slots.length) return;
+  session.slots.splice(i, 1);   // splice repacks: remaining players stay contiguous
+  snd(300, 0.12, 'square');
+  renderSlots();
+}
+function armJoin(ev) {
   if (ev) ev.stopPropagation();
-  numPlayers = n;
-  for (var i = 1; i <= 3; i++) document.getElementById('modebtn' + i).classList.toggle('hatsel', n === i);
-  refreshTeamRow();
+  if (session.slots.length >= MAX_SLOTS) return;
+  session.waiting = !session.waiting;
+  renderSlots();
+}
+function joinKeyboard(ev) {
+  if (ev) ev.stopPropagation();
+  claimSlot('kb');
+}
+function renderSlots() {
+  var host = document.getElementById('playerslots');
+  if (!host) return;
+  var html = '';
+  session.slots.forEach(function (s, i) {
+    html += '<button class="pslot claimed" onclick="leaveSlot(' + i + ');event.stopPropagation();" title="Leave">' +
+      '<div class="pslot-num">Player ' + (i + 1) + '</div>' +
+      '<div class="pslot-dev">' + slotDeviceLabel(s) + '</div>' +
+      '<div class="pslot-x">✕ leave</div></button>';
+  });
+  if (session.slots.length < MAX_SLOTS) {
+    if (session.waiting) {
+      html += '<button class="pslot waiting" onclick="armJoin(event)">' +
+        '<div class="pslot-plus">…</div>' +
+        '<div class="pslot-dev">Press a button<br>on the controller!</div>' +
+        '<div class="pslot-x">click to cancel</div></button>';
+    } else {
+      html += '<button class="pslot empty" onclick="armJoin(event)">' +
+        '<div class="pslot-plus">+</div>' +
+        '<div class="pslot-dev">Add player</div></button>';
+    }
+    if (session.slots.length === 0) {
+      html += '<button class="pslot kb" onclick="joinKeyboard(event)">' +
+        '<div class="pslot-plus">⌨</div>' +
+        '<div class="pslot-dev">Play with<br>keyboard</div></button>';
+    }
+  }
+  host.innerHTML = html;
+  // numPlayers reflects claimed players live (min 1 — solo keyboard default)
+  numPlayers = Math.max(1, session.slots.length);
+  var hint = document.getElementById('joinhint');
+  if (hint) hint.style.display = session.slots.length ? 'none' : 'block';
+  mCol = Math.min(mCol, Math.max(0, titleButtons(MENU_ROWS[mRow]).length - 1));
+  renderTitleFocus();
   updatePadStatus();
 }
 
-// Team/Free-for-all toggle: only meaningful with 2+ players, so the row
-// appears (and joins the d-pad grid) only in multiplayer — mirrors how boss
-// mode splices in the level picker.
-function pickTeam(v, el, ev) {
+// Game type: Versus (free-for-all) vs Co-op team. Independent of player count;
+// only takes effect in multiplayer (coopActive gates on that in startLevel).
+function pickGameType(gt, ev) {
   if (ev) ev.stopPropagation();
-  coop = !!v;
-  document.getElementById('teambtn0').classList.toggle('hatsel', !coop);
-  document.getElementById('teambtn1').classList.toggle('hatsel', coop);
-}
-function refreshTeamRow() {
-  var show = numPlayers >= 2;
-  document.getElementById('teamrow').style.display = show ? 'block' : 'none';
-  var idx = MENU_ROWS.indexOf('teambtns');
-  if (show && idx < 0) MENU_ROWS.splice(MENU_ROWS.indexOf('modebtns') + 1, 0, 'teambtns');
-  else if (!show && idx >= 0) MENU_ROWS.splice(idx, 1);
-  mRow = Math.min(mRow, MENU_ROWS.length - 1);
-  mCol = Math.min(mCol, titleButtons(MENU_ROWS[mRow]).length - 1);
-  renderTitleFocus();
+  session.gameType = gt;
+  coop = (gt === 'coop');
+  document.getElementById('gtffa').classList.toggle('gtsel', !coop);
+  document.getElementById('gtcoop').classList.toggle('gtsel', coop);
 }
 
 var playerColor = 0x2979ff;
@@ -49,13 +120,14 @@ function hideRules(ev) {
 }
 
 // ---- title menu controller navigation ----
-var MENU_ROWS = ['modebtns', 'colorbtns', 'hatbtns', 'startbtns', 'rulesrow'];
+var MENU_ROWS = ['playerslots', 'gametyperow', 'colorbtns', 'hatbtns', 'startbtns', 'rulesrow'];
 // boss mode (play.py --boss): a start-level picker row joins the menu grid,
 // fully d-pad navigable like every other row
-if (bossMode) MENU_ROWS.splice(3, 0, 'levelbtns');
+if (bossMode) MENU_ROWS.splice(MENU_ROWS.indexOf('startbtns'), 0, 'levelbtns');
 var mRow = MENU_ROWS.indexOf('startbtns'), mCol = 0;
 function titleButtons(rid) {
-  return Array.prototype.slice.call(document.getElementById(rid).querySelectorAll('button'));
+  var el = document.getElementById(rid);
+  return el ? Array.prototype.slice.call(el.querySelectorAll('button')) : [];
 }
 function renderTitleFocus() {
   MENU_ROWS.forEach(function (rid, ri) {
@@ -289,17 +361,23 @@ var padDiscMsg = '';
 // (.index/.id/.mapping/.connected all preserved).
 function connectedPads() { return Input.pads(); }
 function padByIndex(i) { return Input.byIndex(i); }
-function requiredPads() { return Math.max(0, numPlayers - 1); }
-function controllersReady() { return connectedPads().length >= requiredPads(); }
+function requiredPads() {
+  return session.slots.filter(function (s) { return s.kind === 'pad'; }).length;
+}
+// Ready = every pad a player claimed is currently connected. Zero claimed slots
+// is fine (solo keyboard + mouse). A claimed keyboard slot is always ready.
+function controllersReady() {
+  var s = session.slots;
+  for (var i = 0; i < s.length; i++) if (s[i].kind === 'pad' && !padByIndex(s[i].padIndex)) return false;
+  return true;
+}
+// Build padAssign straight from the claimed slots (claim order = player order).
+// Only Player 1 may be keyboard (-1); P2/P3 slots are always pads by construction.
 function assignPads() {
-  var cps = connectedPads();
-  if (cps.length >= numPlayers) {
-    // enough controllers for everyone (P1's is optional but welcome)
-    padAssign = { p1: cps[0].index, p2: cps[1] ? cps[1].index : null, p3: cps[2] ? cps[2].index : null };
-  } else {
-    // one short: P1 takes keyboard + mouse, pads go to P2 and P3
-    padAssign = { p1: -1, p2: cps[0] ? cps[0].index : null, p3: cps[1] ? cps[1].index : null };
-  }
+  var s = session.slots;
+  function idxOf(i) { return s[i] ? (s[i].kind === 'kb' ? -1 : s[i].padIndex) : null; }
+  padAssign = s.length ? { p1: idxOf(0), p2: idxOf(1), p3: idxOf(2) }
+                       : { p1: -1, p2: null, p3: null };   // no one joined: solo keyboard
 }
 function reclaimPads() {
   // a reconnected controller can come back on a new index — hand it to whoever lost theirs
@@ -331,23 +409,19 @@ var lastPadStatusHtml = null;
 function updatePadStatus() {
   var el = document.getElementById('padstatus');
   if (!el) return;
-  var n = connectedPads().length;
-  var lines = [], ready = controllersReady();
-  if (numPlayers === 1) {
-    lines.push('P1: ' + (n >= 1 ? 'Controller 1' : 'keyboard + mouse'));
+  var s = session.slots, ready = controllersReady();
+  var lines = [];
+  if (!s.length) {
+    lines.push('Solo play: keyboard + mouse — or add a controller above');
   } else {
-    var all = n >= numPlayers;
-    lines.push('P1: ' + (all ? 'Controller 1' : 'keyboard + mouse'));
-    for (var p = 2; p <= numPlayers; p++) {
-      var pi = all ? p - 1 : p - 2;
-      lines.push('P' + p + ': ' + (pi >= 0 && pi < n ? 'Controller ' + (pi + 1)
-        : '<span style="color:#ef9a9a">controller missing — connect one</span>'));
-    }
+    s.forEach(function (slot, i) {
+      var ok = slot.kind === 'kb' || padByIndex(slot.padIndex);
+      lines.push('P' + (i + 1) + ': ' + slotDeviceLabel(slot) +
+        (ok ? '' : ' <span style="color:#ef9a9a">(disconnected!)</span>'));
+    });
   }
-  var short = requiredPads() - n;
   var html = lines.join(' &middot; ') +
-    (ready ? '' : '<br><span style="color:#ffd54f">Connect ' + short +
-      ' more controller' + (short === 1 ? '' : 's') + ' to start</span>');
+    (ready ? '' : '<br><span style="color:#ffd54f">Reconnect the controller to start</span>');
   if (html !== lastPadStatusHtml) {
     lastPadStatusHtml = html;
     el.innerHTML = html;
@@ -367,7 +441,8 @@ function flashStartHint() {
 }
 // the ONE gate every start path must pass through
 function canStartGame() {
-  return (!running || gameOver) && !initialsActive && !resultsActive && !rulesOpen && !menuOpen && controllersReady();
+  return (!running || gameOver) && !initialsActive && !resultsActive && !rulesOpen &&
+         !(typeof helpOpen !== 'undefined' && helpOpen) && !menuOpen && controllersReady();
 }
 
 function pickDiff(d, ev) {

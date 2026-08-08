@@ -1,24 +1,114 @@
+  /* ===== LEGO-brick design tokens (shared by main menu, in-game menu, join
+     tiles, and the controller Help Panel — one source of truth so the whole
+     UI is consistent by construction). ===== */
+  :root {
+    --brick-red: #e5322b; --brick-red-lo: #a81f1a;
+    --brick-yellow: #ffcf3f; --brick-yellow-lo: #c99a00;
+    --brick-blue: #2f6fe0; --brick-blue-lo: #1c3aa0;
+    --brick-green: #57b93a; --brick-green-lo: #2f7d1e;
+    --brick-teal: #12b3a3; --brick-teal-lo: #0a7a70;
+    --brick-magenta: #c33bd8; --brick-magenta-lo: #7d1f8c;
+    --gold: #ffd54f; --gold-lo: #7a5c00;
+    --ink: #0b0f24;                 /* heavy dark outline */
+    --panel-bg: linear-gradient(180deg, #1c2450 0%, #131a38 100%);
+    --gloss: rgba(255, 255, 255, 0.42);
+    --type-display: 'Arial Black', 'Segoe UI', Arial, sans-serif;
+    --t-fast: 120ms; --t-pop: 180ms;
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --space-1: 6px; --space-2: 10px; --space-3: 16px; --space-4: 24px;
+  }
   html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; font-family: Arial, Helvetica, sans-serif; }
+  /* The 3D arena renders behind the menu; a soft vignette (not a flat wall)
+     keeps it visible while the setup card stays readable. */
   #overlay {
-    position: fixed; inset: 0; background: rgba(20, 25, 45, 0.88); color: #fff;
+    position: fixed; inset: 0; color: #fff;
+    background: radial-gradient(ellipse at 50% 42%, rgba(14, 20, 48, 0.55) 0%, rgba(6, 8, 24, 0.9) 100%);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; z-index: 10; cursor: pointer;
     overflow-y: auto; padding: 20px 0;
   }
-  #overlay h1 { font-size: 42px; margin: 0 0 6px; }
-  #bigmsg { font-size: 34px; color: #ffd54f; margin-bottom: 8px; }
-  #overlay p { font-size: 19px; margin: 5px 0; }
+  /* Chunky LEGO wordmark: fat outlined display type, gold with a heavy dark
+     edge, tipped a hair so it feels hand-placed. */
+  #overlay h1 {
+    font-family: var(--type-display); font-size: 58px; margin: 0 0 4px; color: var(--brick-yellow);
+    letter-spacing: 1px; transform: rotate(-2deg);
+    text-shadow: 0 3px 0 var(--gold-lo), 0 6px 0 var(--ink), 0 10px 16px rgba(0, 0, 0, 0.6);
+    -webkit-text-stroke: 2px var(--ink);
+  }
+  #bigmsg { font-size: 34px; color: var(--gold); margin-bottom: 8px; text-shadow: 0 2px 0 var(--ink); }
+  #overlay p { font-size: 18px; margin: 5px 0; }
+  /* The setup controls sit on a glossy brick console card so they read over
+     the moving arena. */
+  #diffbtns {
+    background: var(--panel-bg); border: 4px solid var(--gold); border-radius: 22px;
+    padding: 16px 26px 18px; margin: 8px 12px; max-width: 680px;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.12);
+  }
+  .setup-h {
+    font-family: var(--type-display); font-size: 16px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--gold); margin: 14px 0 6px; text-shadow: 0 2px 0 var(--ink);
+  }
+  .setup-hint { font-size: 14px; color: #b9c4e6; margin: 4px auto 8px; max-width: 460px; line-height: 1.4; }
+  /* Difficulty = big primary brick buttons (green/orange/red set inline). */
   .btn {
-    font-size: 24px; color: #fff; border: none; border-radius: 12px;
-    padding: 14px 30px; margin: 8px; cursor: pointer;
+    font-family: var(--type-display); font-size: 22px; color: #fff; border: 3px solid var(--ink);
+    border-radius: 14px; padding: 12px 28px; margin: 8px; cursor: pointer;
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 var(--gloss);
+    transition: transform var(--t-fast) ease, box-shadow var(--t-fast) ease, filter var(--t-fast) ease;
   }
-  .hatbtn {
-    font-size: 17px; color: #fff; background: #3a4470; border: 3px solid transparent;
-    border-radius: 10px; padding: 8px 18px; margin: 4px; cursor: pointer;
+  .btn:hover { filter: brightness(1.12); transform: translateY(-2px); }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 var(--gloss); }
+  /* Small chunky "stud" chips for color / hat / level / game-type picks. */
+  .hatbtn, .brick-btn {
+    font-family: var(--type-display); font-size: 16px; color: #fff;
+    background: linear-gradient(180deg, #46527e 0%, #303a63 100%);
+    border: 3px solid var(--ink); border-radius: 12px; padding: 8px 16px; margin: 4px; cursor: pointer;
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.22);
+    transition: transform var(--t-fast) var(--ease-spring), box-shadow var(--t-fast) ease, filter var(--t-fast) ease;
   }
-  .hatbtn:hover { background: #4a5590; }
-  .hatbtn.hatsel { border-color: #ffd54f; background: #4a5590; }
-  .hatbtn.focus, .btn.focus { outline: 4px solid #fff; outline-offset: 2px; }
+  .hatbtn:hover, .brick-btn:hover { filter: brightness(1.14); transform: translateY(-2px) scale(1.04); }
+  .hatbtn:active, .brick-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.22); }
+  /* Selected pick (color/hat/level) + game-type selection: gold brick. */
+  .hatbtn.hatsel, .brick-btn.gtsel {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #5a83ff 0%, #274bc4 100%);
+    box-shadow: 0 4px 0 var(--brick-blue-lo), 0 0 0 3px rgba(255, 213, 79, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  }
+  /* Controller / keyboard FOCUS ring — must read clearly for gamepad nav. */
+  .hatbtn.focus, .btn.focus, .brick-btn.focus, .pslot.focus {
+    outline: 4px solid var(--gold); outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.35), 0 6px 0 var(--ink), inset 0 2px 0 var(--gloss);
+    transform: translateY(-2px) scale(1.05);
+  }
+  #gametyperow { margin: 4px 0 2px; }
+  /* ---- player-join slot tiles ---- */
+  #playerslots {
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 4px 0 2px;
+  }
+  .pslot {
+    width: 150px; min-height: 92px; border-radius: 16px; cursor: pointer; color: #fff;
+    border: 4px solid var(--ink); padding: 8px 6px; font-family: var(--type-display);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 var(--gloss);
+    transition: transform var(--t-fast) var(--ease-spring), filter var(--t-fast) ease;
+  }
+  .pslot:hover { transform: translateY(-2px) scale(1.03); filter: brightness(1.08); }
+  .pslot.empty { background: linear-gradient(180deg, #3b4a2e 0%, #2a3720 100%); border-style: dashed; opacity: 0.92; }
+  .pslot.kb { background: linear-gradient(180deg, #4a4360 0%, #342c47 100%); }
+  .pslot.waiting { background: linear-gradient(180deg, var(--brick-yellow) 0%, var(--brick-yellow-lo) 100%); color: var(--ink); animation: slotpulse 0.9s ease-in-out infinite; }
+  .pslot.claimed { background: linear-gradient(180deg, var(--brick-green) 0%, var(--brick-green-lo) 100%); }
+  .pslot-plus { font-size: 34px; line-height: 1; }
+  .pslot-num { font-size: 18px; letter-spacing: 1px; text-shadow: 0 2px 0 var(--ink); }
+  .pslot-dev { font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; }
+  .pslot-x { font-size: 11px; font-family: Arial, sans-serif; opacity: 0.85; margin-top: 2px; }
+  @keyframes slotpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  @media (prefers-reduced-motion: reduce) {
+    .pslot.waiting { animation: none; }
+    .btn, .hatbtn, .brick-btn, .pslot { transition: none; }
+    #overlay h1 { transform: rotate(0deg); }
+  }
   .initbox {
     width: 58px; height: 70px; font-size: 44px; font-weight: bold; color: #fff;
     background: #2c3450; border: 4px solid rgba(255,255,255,0.4); border-radius: 10px;
@@ -170,3 +260,40 @@
   .rtable td { padding: 3px 12px; color: #fff; }
   .rtable td.rlabel { text-align: left; color: #b3e5fc; }
   .rtable td.rval { text-align: center; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; }
+  /* Controller Help Panel — glossy "Lego City" look, matches .menu */
+  #helppanel {
+    width: 680px; max-width: 94vw; max-height: 90vh; overflow-y: auto;
+  }
+  #helptoggle {
+    display: flex; gap: var(--space-1); justify-content: center;
+    margin: 0 auto var(--space-3);
+  }
+  .helptypebtn {
+    font-family: var(--type-display); font-size: 16px; font-weight: bold;
+    padding: 8px 18px; border-radius: 12px; cursor: pointer; color: #fff;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    background: linear-gradient(180deg, #3a4560 0%, #26324a 100%);
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+    transition: transform var(--t-fast) ease, box-shadow var(--t-fast) ease, filter var(--t-fast) ease;
+  }
+  .helptypebtn:hover { filter: brightness(1.12); transform: translateY(-2px); }
+  .helptypebtn.sel {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #5a83ff 0%, #274bc4 100%);
+    box-shadow: 0 4px 0 var(--brick-blue-lo), 0 0 0 3px rgba(255, 213, 79, 0.55),
+                inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  }
+  #helphint {
+    text-align: center; color: var(--gold); font-weight: bold;
+    margin: 0 auto var(--space-2); min-height: 20px; font-size: 15px;
+  }
+  #helpstage {
+    max-width: 600px; margin: 0 auto var(--space-3);
+  }
+  #helpstage svg { display: block; width: 100%; height: auto; }
+  #helpclose { margin-top: var(--space-2); }
+  @media (prefers-reduced-motion: reduce) {
+    .helptypebtn { transition: none; }
+    .helptypebtn:hover { transform: none; }
+  }
