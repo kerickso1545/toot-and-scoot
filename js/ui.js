@@ -6,7 +6,12 @@
 var MAX_SLOTS = 3;   // engine supports 3 humans (player / player2 / player3)
 // session.slots[i] describes Player i+1: {kind:'pad', padIndex:n} or {kind:'kb'}.
 // Contiguous by construction (claim appends the next slot; leave splices+repacks).
-var session = { slots: [], waiting: false, gameType: 'ffa' };
+var session = { slots: [], gameType: 'ffa' };
+// Join is DIRECT: an unassigned controller that presses A joins the next slot
+// (handled per-frame in animate). "A" is read as south OR east, because the
+// bottom-vs-right A/B letters differ between Xbox and Switch pads — so pressing
+// A works on either brand. No arm-first step; an ASSIGNED pad navigates menus
+// instead of joining (see the title-screen block in main.js).
 
 function claimedCount() { return session.slots.length; }
 function padIndexInUse(idx) {
@@ -29,7 +34,6 @@ function claimSlot(kind, padIndex) {
   if (kind === 'kb' && session.slots.length !== 0) return false;    // keyboard = P1 only
   if (kind === 'pad' && padIndexInUse(padIndex)) return false;      // one slot per pad
   session.slots.push(kind === 'kb' ? { kind: 'kb' } : { kind: 'pad', padIndex: padIndex });
-  session.waiting = false;
   snd(660, 0.1, 'sine'); snd(880, 0.14, 'sine');
   renderSlots();
   return true;
@@ -38,12 +42,6 @@ function leaveSlot(i) {
   if (i < 0 || i >= session.slots.length) return;
   session.slots.splice(i, 1);   // splice repacks: remaining players stay contiguous
   snd(300, 0.12, 'square');
-  renderSlots();
-}
-function armJoin(ev) {
-  if (ev) ev.stopPropagation();
-  if (session.slots.length >= MAX_SLOTS) return;
-  session.waiting = !session.waiting;
   renderSlots();
 }
 function joinKeyboard(ev) {
@@ -61,16 +59,11 @@ function renderSlots() {
       '<div class="pslot-x">✕ leave</div></button>';
   });
   if (session.slots.length < MAX_SLOTS) {
-    if (session.waiting) {
-      html += '<button class="pslot waiting" onclick="armJoin(event)">' +
-        '<div class="pslot-plus">…</div>' +
-        '<div class="pslot-dev">Press a button<br>on the controller!</div>' +
-        '<div class="pslot-x">click to cancel</div></button>';
-    } else {
-      html += '<button class="pslot empty" onclick="armJoin(event)">' +
-        '<div class="pslot-plus">+</div>' +
-        '<div class="pslot-dev">Add player</div></button>';
-    }
+    // instructional "press A on a controller to join" tile (clicking it is a
+    // no-op — joining is done by pressing a controller button, not the mouse)
+    html += '<button class="pslot empty" onclick="event.stopPropagation()">' +
+      '<div class="pslot-plus">+</div>' +
+      '<div class="pslot-dev">Press <b>A</b> on a<br>controller to join</div></button>';
     if (session.slots.length === 0) {
       html += '<button class="pslot kb" onclick="joinKeyboard(event)">' +
         '<div class="pslot-plus">⌨</div>' +
@@ -78,7 +71,7 @@ function renderSlots() {
     }
   }
   host.innerHTML = html;
-  // numPlayers reflects claimed players live (min 1 — solo keyboard default)
+  // numPlayers reflects claimed players live (min 1 — solo default)
   numPlayers = Math.max(1, session.slots.length);
   var hint = document.getElementById('joinhint');
   if (hint) hint.style.display = session.slots.length ? 'none' : 'block';
@@ -373,11 +366,14 @@ function controllersReady() {
 }
 // Build padAssign straight from the claimed slots (claim order = player order).
 // Only Player 1 may be keyboard (-1); P2/P3 slots are always pads by construction.
+// If NOBODY explicitly joined, fall back to the old "just works" solo behavior:
+// P1 uses the first connected controller if there is one, else keyboard + mouse.
 function assignPads() {
   var s = session.slots;
   function idxOf(i) { return s[i] ? (s[i].kind === 'kb' ? -1 : s[i].padIndex) : null; }
-  padAssign = s.length ? { p1: idxOf(0), p2: idxOf(1), p3: idxOf(2) }
-                       : { p1: -1, p2: null, p3: null };   // no one joined: solo keyboard
+  if (s.length) { padAssign = { p1: idxOf(0), p2: idxOf(1), p3: idxOf(2) }; return; }
+  var cps = connectedPads();
+  padAssign = { p1: cps[0] ? cps[0].index : -1, p2: null, p3: null };
 }
 function reclaimPads() {
   // a reconnected controller can come back on a new index — hand it to whoever lost theirs
@@ -412,7 +408,9 @@ function updatePadStatus() {
   var s = session.slots, ready = controllersReady();
   var lines = [];
   if (!s.length) {
-    lines.push('Solo play: keyboard + mouse — or add a controller above');
+    var nPads = connectedPads().length;
+    lines.push(nPads ? 'Solo: controller or keyboard — press A on a controller to add players'
+                     : 'Solo: keyboard + mouse — connect a controller to add players');
   } else {
     s.forEach(function (slot, i) {
       var ok = slot.kind === 'kb' || padByIndex(slot.padIndex);

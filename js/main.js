@@ -1485,23 +1485,22 @@ function animate() {
   }
   // keep the setup screen's controller status + start-button state fresh
   if ((!running || gameOver) && overlay.style.display !== 'none') updatePadStatus();
-  // --- title-screen player join (runs across ALL pads, not just cps[0], so each
-  // controller can join itself): while a slot is armed, an UNASSIGNED pad's south
-  // button claims it (claim order = player order); East(B) cancels the wait or
-  // leaves an already-claimed slot. wasWaiting freezes the armed state for this
-  // frame so the same press can't both arm (via titleActivate) and claim. ---
-  var wasWaiting = session.waiting;
-  if ((!running || gameOver) && overlay.style.display !== 'none' &&
-      !rulesOpen && !helpOpen && !initialsActive && !resultsActive && !menuOpen) {
+  // --- title-screen player join. Snapshot which pad indices are ALREADY players
+  // at the start of this frame: a single A-press then does exactly one thing —
+  // JOIN (pad was unassigned) or menu-activate (pad was already a player, handled
+  // in the title branch below). "A" is read as south OR east because the bottom-
+  // vs-right A/B letters differ between Xbox and Switch pads, so pressing A works
+  // on either brand. Runs across ALL pads so each controller joins itself. ---
+  var assignedStart = {};
+  session.slots.forEach(function (s) { if (s.kind === 'pad') assignedStart[s.padIndex] = true; });
+  var titleActive = (!running || gameOver) && overlay.style.display !== 'none' &&
+      !rulesOpen && !helpOpen && !initialsActive && !resultsActive && !menuOpen;
+  if (titleActive) {
     cps.forEach(function (np) {
-      var south = Input.button(np, 0), east = Input.button(np, 1);
-      var ps = padJoinPrev[np.index] || { s: false, e: false };
-      if (south && !ps.s && wasWaiting && session.waiting && !padIndexInUse(np.index)) claimSlot('pad', np.index);
-      if (east && !ps.e) {
-        if (session.waiting) { session.waiting = false; renderSlots(); }   // cancel the wait
-        else { var si = slotOfPad(np.index); if (si >= 0) leaveSlot(si); } // leave a claimed slot
-      }
-      padJoinPrev[np.index] = { s: south, e: east };
+      var aBtn = Input.button(np, 0) || Input.button(np, 1);
+      var ps = padJoinPrev[np.index] || { a: false };
+      if (aBtn && !ps.a && !assignedStart[np.index] && session.slots.length < MAX_SLOTS) claimSlot('pad', np.index);
+      padJoinPrev[np.index] = { a: aBtn };
     });
   }
   if (pad) {
@@ -1550,9 +1549,10 @@ function animate() {
       if (dnNow && !padDnPrev) titleNav(0, 1);
       if (ltNow && !padLtPrev) titleNav(-1, 0);
       if (rtNow && !padRtPrev) titleNav(1, 0);
-      // !wasWaiting: while a slot is armed, south is a CLAIM (handled above), not
-      // a menu activate — so arming and claiming never collide on one press
-      if (aNow && !padAPrev && !wasWaiting) titleActivate();
+      // activate ONLY for a pad that was already a player at frame start — an
+      // unassigned pad's A is a JOIN (handled above), never a menu activate, so
+      // the join press can't also fire a menu button
+      if (aNow && !padAPrev && pad && assignedStart[pad.index]) titleActivate();
     }
     padUpPrev = upNow; padDnPrev = dnNow; padAPrev = aNow; padLtPrev = ltNow; padRtPrev = rtNow;
   }
