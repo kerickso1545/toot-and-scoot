@@ -224,8 +224,10 @@ function startLevel(keepStats) {
   var sp1 = levelSpawns[0] || [1, 1];
   var c = tileCenter(sp1[0], sp1[1]);
   var prev = keepStats && !twoPlayer && player ? player : null;   // solo also carries upgrades + held item
+  var pr1 = personaFor(0);   // each human plays as their chosen character (look + fart voice)
   player = {
-    x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(playerColor, playerHat), baseColor: playerColor,
+    x: c.x, z: c.z, alive: true, mesh: makePlayerMesh(pr1.color, HATMAP[pr1.name]), baseColor: pr1.color,
+    name: pr1.name,
     yaw: spawnFacing(sp1, Math.PI + 0.6), pitch: 0.7,
     speed:    prev ? prev.speed    : 5,
     maxBombs: prev ? prev.maxBombs : 1,
@@ -246,9 +248,10 @@ function startLevel(keepStats) {
   if (twoPlayer) {
     var sp2 = levelSpawns[1] || sp1;
     var c2 = tileCenter(sp2[0], sp2[1]);
+    var pr2 = personaFor(1);
     player2 = {
       x: c2.x, z: c2.z, alive: true,
-      mesh: makePlayerMesh(0x00c853, playerHat === 'cap' ? 'party' : 'cap'), baseColor: 0x00c853,
+      mesh: makePlayerMesh(pr2.color, HATMAP[pr2.name]), baseColor: pr2.color, name: pr2.name,
       yaw: spawnFacing(sp2, 0.6), pitch: 0.7,
       speed: 5, maxBombs: 1, range: 2, held: null, wins: cs2.wins, lives: cs2.lives, score: cs2.score, stamina: 100,
       kills: cs2.kills, crates: cs2.crates, selfGas: cs2.selfGas, itemsUsed: cs2.itemsUsed, bestT: cs2.bestT,
@@ -259,11 +262,10 @@ function startLevel(keepStats) {
     if (numPlayers >= 3) {
       var sp3 = levelSpawns[2] || sp1;
       var c3 = tileCenter(sp3[0], sp3[1]);
-      var p3color = playerColor === 0xd500f9 ? 0xff9100 : 0xd500f9;
-      var p3hat = playerHat === 'tproll' ? 'party' : 'tproll';
+      var pr3 = personaFor(2);
       player3 = {
         x: c3.x, z: c3.z, alive: true,
-        mesh: makePlayerMesh(p3color, p3hat), baseColor: p3color,
+        mesh: makePlayerMesh(pr3.color, HATMAP[pr3.name]), baseColor: pr3.color, name: pr3.name,
         yaw: spawnFacing(sp3, 2.5), pitch: 0.7,
         speed: 5, maxBombs: 1, range: 2, held: null, wins: cs3.wins, lives: cs3.lives, score: cs3.score, stamina: 100,
         kills: cs3.kills, crates: cs3.crates, selfGas: cs3.selfGas, itemsUsed: cs3.itemsUsed, bestT: cs3.bestT,
@@ -329,11 +331,16 @@ function startLevel(keepStats) {
     bots.push(bossBot);
   } else {
     var botDefs = [[0xab47bc,'Sir Toots-a-Lot'],[0xff7043,'Stinky Pete'],[0xfdd835,'Windy Wendy'],[0xec407a,'Princess Poot'],[0x26c6da,'Gassy Gus'],[0xeceff1,'Captain Cheeks']];
-    // never index a spawn that doesn't exist: cap the bot count to available spawns
-    var botN = Math.min(levelParams.botCount, spawns.length);
+    // a persona a human is playing as is removed from the enemy pool this match
+    // (you never fight your own character); enemies fill from the rest
+    var taken = takenPersonaNames();
+    var avail = botDefs.filter(function (d) { return taken.indexOf(d[1]) < 0; });
+    // never index a spawn that doesn't exist, and never more enemies than
+    // remaining characters
+    var botN = Math.min(levelParams.botCount, spawns.length, avail.length);
     for (var i = 0; i < botN; i++) {
       var sp = spawns[i];
-      var b = makeBot(sp[0], sp[1], botDefs[i][0], botDefs[i][1]);
+      var b = makeBot(sp[0], sp[1], avail[i][0], avail[i][1]);
       b.speed = levelParams.botSpeed;
       b.range = levelParams.botRange;
       bots.push(b);

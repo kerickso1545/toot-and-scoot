@@ -14,6 +14,26 @@ var session = { slots: [], gameType: 'ffa' };
 // instead of joining (see the title-screen block in main.js).
 
 function claimedCount() { return session.slots.length; }
+// Persona chosen for player i (0-based). Defaults to the i-th persona so solo /
+// unclaimed play still gets a valid character. Read by startLevel (look + voice)
+// and by the enemy filter (a taken persona won't also spawn as a rival).
+function personaFor(i) {
+  var s = session.slots[i];
+  var idx = (s && typeof s.persona === 'number') ? s.persona : i;
+  return PERSONAS[((idx % PERSONAS.length) + PERSONAS.length) % PERSONAS.length];
+}
+function takenPersonaNames() {
+  var out = [];
+  for (var i = 0; i < Math.max(1, session.slots.length); i++) out.push(personaFor(i).name);
+  return out;
+}
+function personaTakenBy(idx, exceptSlot) {
+  for (var i = 0; i < session.slots.length; i++) {
+    if (i === exceptSlot) continue;
+    if (session.slots[i] && session.slots[i].persona === idx) return true;
+  }
+  return false;
+}
 function padIndexInUse(idx) {
   return session.slots.some(function (s) { return s && s.kind === 'pad' && s.padIndex === idx; });
 }
@@ -29,11 +49,18 @@ function slotDeviceLabel(s) {
 }
 // Claim the next open slot. kind 'pad' (padIndex) or 'kb' (keyboard, P1 only —
 // the engine only lets Player 1 fall back to keyboard).
+function firstFreePersona() {
+  for (var p = 0; p < PERSONAS.length; p++) if (!personaTakenBy(p, -1)) return p;
+  return 0;
+}
 function claimSlot(kind, padIndex) {
   if (session.slots.length >= MAX_SLOTS) return false;
   if (kind === 'kb' && session.slots.length !== 0) return false;    // keyboard = P1 only
   if (kind === 'pad' && padIndexInUse(padIndex)) return false;      // one slot per pad
-  session.slots.push(kind === 'kb' ? { kind: 'kb' } : { kind: 'pad', padIndex: padIndex });
+  var slot = kind === 'kb' ? { kind: 'kb' } : { kind: 'pad', padIndex: padIndex };
+  slot.persona = firstFreePersona();   // each player starts on a different character
+  slot.ready = false;
+  session.slots.push(slot);
   snd(660, 0.1, 'sine'); snd(880, 0.14, 'sine');
   renderSlots();
   return true;

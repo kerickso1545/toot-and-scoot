@@ -15,6 +15,20 @@ var startAtLevel = 1, bossMode = false;
   var m = /[?&]level=(\d+)/.exec(location.search);
   if (m) startAtLevel = Math.max(1, Math.min(99, parseInt(m[1], 10) || 1));
 })();
+// ---- personas: players pick one of the game's characters (Mario-Kart style) ----
+// name + body color; the hat comes from HATMAP[name] (meshes.js) and the fart
+// voice from FARTS[name] (below). A persona a human takes is removed from the
+// enemy pool that match (see startLevel), so you never fight your own character.
+// Colors match the old enemy botDefs so the characters look identical whether
+// human- or AI-controlled.
+var PERSONAS = [
+  { name: 'Sir Toots-a-Lot', color: 0xab47bc },
+  { name: 'Stinky Pete',     color: 0xff7043 },
+  { name: 'Windy Wendy',     color: 0xfdd835 },
+  { name: 'Princess Poot',   color: 0xec407a },
+  { name: 'Gassy Gus',       color: 0x26c6da },
+  { name: 'Captain Cheeks',  color: 0xeceff1 }
+];
 var PU_NAME = { bomb: 'EXTRA GAS', range: 'BIG BLAST', speed: 'SUPER SCOOT', wall: 'TRAP WALL', spray: 'AIR FRESHENER', turbo: 'TURBO TOOT' };
 var PU_COLOR = { bomb: '#ffab40', range: '#ff5252', speed: '#40c4ff', wall: '#66bb6a', spray: '#eceff1', turbo: '#ce93d8' };
 // ---- balance caps for passive upgrades (players AND rivals) ----
