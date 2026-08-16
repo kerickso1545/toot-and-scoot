@@ -194,6 +194,56 @@ function refreshSharedSelected() {
   for (var i = 0; i < db.length; i++) db[i].classList.toggle('diffsel', i === difficulty);
 }
 
+// ---- shared-strip cursor (gamepad/keyboard nav off a player card) ----
+// The lobby is per-card (each pad drives its own character card), but the shared
+// choices — Mode, Difficulty, How-to-play, Controller — used to be reachable ONLY
+// via Player-1 shoulder chords, so P2/P3 (and any player who didn't know the
+// chord) felt trapped on their card. A card's D-pad DOWN now drops a single
+// visible cursor onto this strip; UP past the top returns to the card. sharedOwner
+// is the pad index (or 'kb') currently holding the cursor, or null when everyone
+// is on their card. Only one owner at a time — a single global cursor.
+var sharedOwner = null, sharedIdx = 0;
+function sharedTargets() {
+  // nav order top→bottom; el is the element the gold ring wraps
+  var rr = document.getElementById('rulesrow');
+  var rb = rr ? rr.querySelectorAll('button') : [];
+  return [
+    { el: document.getElementById('gametyperow'), kind: 'mode' },
+    { el: document.getElementById('diffrow'), kind: 'diff' },
+    { el: rb[0] || null, kind: 'rules' },
+    { el: rb[1] || null, kind: 'help' }
+  ];
+}
+function renderSharedFocus() {
+  var t = sharedTargets();
+  for (var i = 0; i < t.length; i++) {
+    if (t[i].el) t[i].el.classList.toggle('lobbyfocus', sharedOwner !== null && i === sharedIdx);
+  }
+}
+function enterShared(owner) { sharedOwner = owner; sharedIdx = 0; snd(600, 0.05, 'sine'); renderSharedFocus(); }
+function exitShared() {
+  if (sharedOwner === null) return;
+  sharedOwner = null; renderSharedFocus(); snd(320, 0.05, 'sine');
+}
+function sharedMove(d) {
+  if (sharedOwner === null) return;
+  var n = sharedIdx + d;
+  if (n < 0) { exitShared(); return; }          // up past the top -> back to the card
+  if (n > 3) return;                             // clamp at the bottom
+  sharedIdx = n; snd(520, 0.04, 'sine'); renderSharedFocus();
+}
+function sharedAdjust(dir) {
+  if (sharedOwner === null) return;
+  if (sharedIdx === 0) { pickGameType(coop ? 'ffa' : 'coop'); snd(520, 0.05, 'sine'); }
+  else if (sharedIdx === 1) cycleDifficulty(dir);   // cycleDifficulty already beeps
+}
+function sharedActivate() {
+  if (sharedOwner === null) return;
+  if (sharedIdx === 2) showRules();
+  else if (sharedIdx === 3) openHelp();
+  else sharedAdjust(1);                            // Mode/Difficulty: face nudges forward
+}
+
 // ---- rules panel ----
 var rulesOpen = false;
 function showRules(ev) {
@@ -544,6 +594,7 @@ function menuAction(act, fromPad) {
     bumpSession();                       // cancels any pending level-clear transition
     running = false; gameOver = true; transitioning = false;
     padDiscMsg = '';
+    sharedOwner = null;                  // clear any lobby shared-strip cursor
     resetReady();                        // back to the lobby: players re-ready to start again
     resetTransientUI();
     hudroot.style.display = 'none';

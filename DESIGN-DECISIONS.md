@@ -145,6 +145,17 @@ respect these unless Kevin explicitly changes them.
   grabbed). Difficulty is a selection, not the start trigger. Each card
   auto-labels its own controller (Switch vs Xbox from the pad id). Ready flags
   reset when a match ends so the lobby is re-startable.
+  - **Shared-strip cursor (2026-08-16)**: the P1-only shoulder chords left
+    P2/P3 unable to reach Mode/Difficulty/How-to-play at all, and even P1's
+    chords were undiscoverable — the controller felt "trapped" on the player
+    card. Fix: a card's **D-pad Down** drops a single visible gold cursor
+    (`.lobbyfocus`) onto the shared strip (Mode → Difficulty → How-to-play →
+    Controller); ◀ ▶ adjust, face activates a button row, Down/Up move, Up past
+    the top returns to the card. Works for ANY player (owner tracked by pad
+    index, or `'kb'`), one owner at a time (`sharedOwner`/`sharedIdx` in ui.js).
+    P1's LB/RB/+/Up shoulder shortcuts are kept as quick extras. A per-frame
+    guard drops a stale cursor on disconnect / return-to-lobby. This did NOT
+    revert the per-card model — it added the missing navigation path.
 - Old-school 3-initial leaderboard entry (d-pad cycles letters).
 - **Glossy "Lego City" popup styling (Kevin/Otto, 2026-07-24)**: the shared
   `.menu` / `.mbtn` classes (pause, settings, results, rules, initials panels)

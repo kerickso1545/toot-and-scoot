@@ -54,6 +54,15 @@ still works to set a start level directly without the picker.
 | Pause menu | + / Start | Esc |
 | Menus | d-pad + A | arrows + Enter |
 
+**In the character-select lobby:** press a face button on a controller to join
+the next player slot, then **◀ ▶ pick your character** and a face button to
+**READY** (the game starts once everyone's ready). To reach the shared **Mode**,
+**Difficulty**, and **How to play** options, press **D-pad Down** to hop from
+your card onto that row — ◀ ▶ change the setting, **Down/Up** move between rows,
+and **Up** from the top row jumps back to your card. Any player can do this, not
+just Player 1. (Keyboard: arrows pick character, Enter readies, Down reaches the
+shared row; the mouse can click anything directly.)
+
 ### Core mechanics
 - Farts linger, then spread fast in four directions; blasts punch through
   crates but stop at walls. Your own farts never set each other off (Extra

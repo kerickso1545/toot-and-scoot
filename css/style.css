@@ -86,6 +86,14 @@
   .setup-shared { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
   .shared-label { font-family: var(--type-display); font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
   #gametyperow, #diffrow { display: inline-flex; gap: 4px; }
+  /* ---- lobby shared-strip cursor: a card's D-pad Down drops focus here so any
+     player (not just P1) can reach Mode / Difficulty / How-to-play / Controller.
+     The gold pulsing ring wraps whichever shared control is focused. ---- */
+  .lobbyfocus {
+    outline: 4px solid var(--gold); outline-offset: 4px; border-radius: 12px;
+    animation: lobbyPulse 0.85s ease-in-out infinite;
+  }
+  @keyframes lobbyPulse { 0%, 100% { outline-color: rgba(255,213,79,1); } 50% { outline-color: rgba(255,213,79,0.3); } }
   .diffbtn.diffsel {
     border-color: var(--gold);
     background: linear-gradient(180deg, #5a83ff 0%, #274bc4 100%);
@@ -130,6 +138,7 @@
   .pcard-plus { font-size: 36px; line-height: 1; }
   @media (prefers-reduced-motion: reduce) {
     .btn, .hatbtn, .brick-btn, .pcard-arrow { transition: none; }
+    .lobbyfocus { animation: none; }
     #overlay h1 { transform: rotate(0deg); }
   }
   .initbox {

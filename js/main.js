@@ -1205,8 +1205,18 @@ document.addEventListener('keydown', function (e) {
     // Enter readies). With no keyboard player yet, Enter joins one as P1.
     var kbi = slotOfKb();
     if (kbi < 0) { if (e.code === 'Enter') joinKeyboard(); return; }
+    if (sharedOwner === 'kb') {   // keyboard card is on the shared strip
+      if (e.code === 'ArrowUp') sharedMove(-1);
+      else if (e.code === 'ArrowDown') sharedMove(1);
+      else if (e.code === 'ArrowLeft') sharedAdjust(-1);
+      else if (e.code === 'ArrowRight') sharedAdjust(1);
+      else if (e.code === 'Enter') sharedActivate();
+      else if (e.code === 'Backspace' || e.code === 'Escape') exitShared();
+      return;
+    }
     if (e.code === 'ArrowLeft') cyclePersona(kbi, -1);
     else if (e.code === 'ArrowRight') cyclePersona(kbi, 1);
+    else if (e.code === 'ArrowDown') enterShared('kb');
     else if (e.code === 'Enter') toggleReady(kbi);
     else if (e.code === 'Backspace' || e.code === 'Escape') leaveSlot(kbi);
     return;
@@ -1502,6 +1512,13 @@ function animate() {
   var titleActive = (!running || gameOver) && overlay.style.display !== 'none' &&
       !rulesOpen && !helpOpen && !initialsActive && !resultsActive && !menuOpen;
   if (titleActive) {
+    // drop a stale shared-strip cursor: owner disconnected, left, or we re-entered
+    // the lobby after a match (its pad no longer maps to a slot)
+    if (sharedOwner !== null) {
+      var ownerOk = sharedOwner === 'kb' ? slotOfKb() >= 0
+                  : (assignedStart[sharedOwner] !== undefined && !!padByIndex(sharedOwner));
+      if (!ownerOk) { sharedOwner = null; renderSharedFocus(); }
+    }
     cps.forEach(function (np) {
       if (running && !gameOver) return;   // a ready press this frame already started the game
       var pv = padJoinPrev[np.index] || {};
@@ -1509,24 +1526,36 @@ function animate() {
       var left = Input.button(np, 14) || np.axes[0] < -0.5;
       var right = Input.button(np, 15) || np.axes[0] > 0.5;
       var up = Input.button(np, 12) || np.axes[1] < -0.5;
+      var down = Input.button(np, 13) || np.axes[1] > 0.5;
       var view = Input.button(np, 8);
       var lb = Input.button(np, 4), rb = Input.button(np, 5), menu = Input.button(np, 9);
       var si = assignedStart[np.index];
       if (si === undefined) {
         if (face && !pv.face && session.slots.length < MAX_SLOTS) claimSlot('pad', np.index);
+      } else if (sharedOwner === np.index) {
+        // this pad holds the shared-strip cursor: Up/Down move it (Up past the top
+        // returns to the card), Left/Right adjust Mode/Difficulty, face activates
+        // a button row, View backs out to the card.
+        if (up && !pv.up) sharedMove(-1);
+        if (down && !pv.down) sharedMove(1);
+        if (left && !pv.left) sharedAdjust(-1);
+        if (right && !pv.right) sharedAdjust(1);
+        if (face && !pv.face) sharedActivate();
+        if (view && !pv.view) exitShared();
       } else {
         if (left && !pv.left) cyclePersona(si, -1);
         if (right && !pv.right) cyclePersona(si, 1);
         if (face && !pv.face) toggleReady(si);
         if (view && !pv.view) leaveSlot(si);
-        if (si === 0) {   // Player 1 hosts the shared settings
+        if (down && !pv.down) enterShared(np.index);   // drop onto the shared strip (ANY player)
+        if (si === 0) {   // Player 1 keeps the quick shoulder shortcuts too
           if (lb && !pv.lb) cycleDifficulty(1);
           if (rb && !pv.rb) pickGameType(coop ? 'ffa' : 'coop');
           if (menu && !pv.menu) openHelp();
           if (up && !pv.up) showRules();
         }
       }
-      padJoinPrev[np.index] = { face: face, left: left, right: right, up: up, view: view, lb: lb, rb: rb, menu: menu };
+      padJoinPrev[np.index] = { face: face, left: left, right: right, up: up, down: down, view: view, lb: lb, rb: rb, menu: menu };
     });
   }
   if (pad) {
