@@ -242,6 +242,38 @@ prototypes). History was carried over with `git-filter-repo` keeping only the
 game's paths, so the full 76-commit story survives; `otto-games` keeps
 everything else unchanged.
 
+## The Android TV app (2026-11-11)
+
+Shipped the same evening as the PWA, because the browser route died on
+contact with real hardware.
+
+- **TV browsers eat the controller.** Measured on the Shield with the
+  Controller Check overlay, TV Bro 2.1.6 + Nintendo Switch Pro Controller:
+  the pad enumerates perfectly (`map:standard`, `type:nintendo`) and reports
+  `axes: 0.00 0.00 0.00 0.00` while the on-screen cursor visibly moves. TV
+  Bro consumes the stick and d-pad motion events to drive its own pointer and
+  maps the east button to Back, so only south and north ever reach the page.
+  Chromium builds gamepad state from the events its view receives, so an app
+  that intercepts them first leaves the page with a permanently centred pad.
+  **No change inside the game can recover input that never arrives.**
+- **Therefore the game gets its own activity.** A Capacitor 6 wrapper serves
+  the bundled copy from `https://localhost` — a secure context, which the
+  Gamepad API requires — with nothing between the controller and the WebView.
+  Confirmed working: stick moves the character.
+- **The WebView was never the problem.** It enumerated the pad correctly
+  through TV Bro; TV Bro's own app code did the intercepting. Worth
+  remembering before blaming Android WebView for anything else.
+- **`packaging/` is deliberately separate from the repo root.** The game stays
+  plain files with no build step — the hard invariant survives. The APK layer
+  only *copies* the game (`sync-www.js`) and wraps it. You can still edit a js
+  file and hit refresh in `play.py` exactly as before.
+- **Both delivery paths are kept.** The APK is how Otto plays on the TV;
+  GitHub Pages stays for laptops, phones and tablets, and as the quick
+  iteration loop (push, reload — no rebuild). They serve the same files.
+- **No `REMAPS` entry was ever needed.** The pad reports standard mapping, so
+  `input.js`'s position-based layer was right all along. The table stays empty
+  until real data says otherwise.
+
 ## Rejected / reverted ideas (don't resurrect without asking)
 - Online multiplayer (out of scope for a single file).
 - Emergency teleporters (all variants) — replaced by connectivity guarantee.

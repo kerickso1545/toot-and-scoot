@@ -6,35 +6,57 @@ last one standing!
 
 ## Play it on the TV (NVIDIA Shield)
 
-This is the way Otto can play whenever he wants, with no laptop involved.
-One-time setup per device, then it's just an icon on the Shield:
+This is how Otto plays: an app on the Shield home screen, no laptop, no
+browser, no internet.
 
-1. On the Shield, install a browser that renders **locally**. Shield TV ships
-   with none. Recommended: **TV Bro** — free, open source, built for Android
-   TV, remote-friendly, and it can switch between the WebView and GeckoView
-   engines (a useful escape hatch if controllers don't register on one of
-   them). Sideloaded Chrome also works.
-   **Do NOT use Puffin TV.** It renders pages on its own servers and streams
-   the picture to your TV, so the game would be running in a datacenter —
-   your controllers would be invisible to it and the 3D would be video.
-   No ADB needed: install **Downloader** from the Play Store and give it the
-   APK's URL.
-2. Go to **kerickso1545.github.io/toot-and-scoot/**
-3. Use the browser's **Install app / Add to Home screen** option.
-4. Launch it from the Shield's apps row. It runs fullscreen, and **after the
-   first launch it needs no internet at all** — the whole game is cached on
-   the device.
-5. Pair your controllers to the Shield in Settings (it handles up to four;
-   the game seats three players).
+Install it with ADB from a machine on the same network:
 
-If controllers don't show up, press **C** on the title screen for the
-Controller Check readout and send it to Kevin — that tells us whether the pad
-is invisible to the browser or just mapped oddly.
+```
+adb connect <shield-ip>:5555
+adb install -r packaging/android/app/build/outputs/apk/debug/app-debug.apk
+```
 
-> **Why not just point the Shield at a laptop on the wifi?** Because browsers
-> only hand the Gamepad API to secure origins. A `http://192.168.x.x` address
-> is not one, so the game would load perfectly and no controller would do
-> anything at all. Hence the installed-app route.
+(Enable **Settings -> Device Preferences -> About -> Build** x7, then
+**Developer options -> Network debugging** to get the IP. Accept the
+authorization prompt on the TV.)
+
+Then launch **Toot and Scoot** from the Shield home screen and pair your
+controllers in Settings. The Shield handles four; the game seats three.
+The whole game is inside the APK, so **it never needs internet**.
+
+To rebuild after changing the game:
+
+```
+cd packaging
+npm run apk
+```
+
+### Do not play this in a TV browser
+
+It looks like it should work and it doesn't. Tested on TV Bro 2.1.6 with a
+Nintendo Switch Pro Controller: the pad enumerates perfectly
+(`map:standard`), buttons south and north reach the game -- and the sticks
+read `0.00` forever, because the browser swallows the stick and d-pad to
+drive its own on-screen cursor and maps the east button to Back. You get a
+character who can fart but cannot walk.
+
+Puffin TV is worse: it renders pages on its own servers and streams the
+picture, so the game would run in a datacenter and never see your
+controllers at all.
+
+Pointing a TV browser at a LAN address fails differently and just as
+confusingly: browsers only expose the Gamepad API on secure origins, so
+`http://192.168.x.x` gives you a game that loads perfectly where no
+controller does anything. The APK sidesteps all of this -- Capacitor serves
+the bundled copy from `https://localhost`, which is a secure context, and
+nothing sits between the pad and the game.
+
+## Play it in a browser
+
+**https://kerickso1545.github.io/toot-and-scoot/** -- works on a desktop or
+laptop browser, and installs as an app on a phone or tablet
+(*Install app* / *Add to Home screen*). Plays offline after the first load.
+Controllers work anywhere the origin is https.
 
 ## Play it on a computer
 
