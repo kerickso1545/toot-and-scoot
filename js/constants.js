@@ -8,10 +8,14 @@ function isBossLevel(l) { return l % BOSS_EVERY === 0; }
 // Parsed here (before ui.js builds the title-menu rows) — depends only on the
 // browser's location global. bossMode shows the start-level picker row;
 // startAtLevel is where every new game begins.
-var startAtLevel = 1, bossMode = false;
+// padDebugStart opens the Controller Check overlay at load: on a TV there is
+// no keyboard, so the C shortcut is unreachable (TV Bro eats key events before
+// the page sees them) and ?paddebug=1 is the only way in.
+var startAtLevel = 1, bossMode = false, padDebugStart = false;
 (function () {
   if (typeof location === 'undefined') return;   // headless test harnesses
   bossMode = /[?&]boss=1/.test(location.search);
+  padDebugStart = /[?&]paddebug=1/.test(location.search);
   var m = /[?&]level=(\d+)/.exec(location.search);
   if (m) startAtLevel = Math.max(1, Math.min(99, parseInt(m[1], 10) || 1));
 })();

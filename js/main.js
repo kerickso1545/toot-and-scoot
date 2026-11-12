@@ -2216,3 +2216,13 @@ if (location.protocol === 'https:' && 'serviceWorker' in navigator) {
     });
   });
 }
+
+// ?paddebug=1 opens the Controller Check overlay at load. On the Shield there
+// is no keyboard and TV Bro swallows key events before the page sees them, so
+// the C shortcut is unreachable — this is the only way to read what the
+// browser actually reports about a pad on a TV.
+if (padDebugStart) {
+  padDebugOn = true;
+  var pdEl = document.getElementById('paddebug');
+  if (pdEl) pdEl.style.display = 'block';
+}
