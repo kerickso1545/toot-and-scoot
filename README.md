@@ -9,8 +9,16 @@ last one standing!
 This is the way Otto can play whenever he wants, with no laptop involved.
 One-time setup per device, then it's just an icon on the Shield:
 
-1. On the Shield, install a Chromium-based browser (there is no preinstalled
-   browser on Shield TV — sideload Chrome, or use TV Bro / Puffin TV).
+1. On the Shield, install a browser that renders **locally**. Shield TV ships
+   with none. Recommended: **TV Bro** — free, open source, built for Android
+   TV, remote-friendly, and it can switch between the WebView and GeckoView
+   engines (a useful escape hatch if controllers don't register on one of
+   them). Sideloaded Chrome also works.
+   **Do NOT use Puffin TV.** It renders pages on its own servers and streams
+   the picture to your TV, so the game would be running in a datacenter —
+   your controllers would be invisible to it and the 3D would be video.
+   No ADB needed: install **Downloader** from the Play Store and give it the
+   APK's URL.
 2. Go to **kerickso1545.github.io/toot-and-scoot/**
 3. Use the browser's **Install app / Add to Home screen** option.
 4. Launch it from the Shield's apps row. It runs fullscreen, and **after the
