@@ -7,10 +7,17 @@
    needed to PLAY on a dev machine — js/main.js only registers this worker
    on https, so `play.py` live-reload is never fighting a cache.
 
-   WHEN YOU ADD OR RENAME A GAME FILE: add it to ASSETS and bump CACHE.
-   The version bump is what evicts the old cache on the next load. */
+   STRATEGY: network-first for same-origin GETs, falling back to the cache.
+   It started out cache-first, which was wrong for a game under active
+   development: the Shield would have pinned the first build it ever saw and
+   no deploy would have reached it again (the browser only re-checks sw.js
+   itself, not the files it cached). Network-first costs a round trip when
+   online and still plays fully offline, which is the right trade while Otto
+   and Kevin are iterating. Revisit if cold start on the TV feels slow.
 
-var CACHE = 'toot-and-scoot-v1';
+   WHEN YOU ADD OR RENAME A GAME FILE: add it to ASSETS and bump CACHE. */
+
+var CACHE = 'toot-and-scoot-v2';
 
 var ASSETS = [
   './',
@@ -63,21 +70,21 @@ self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
 
+  // Network-first: always prefer a fresh copy, fall back to the cache when
+  // the network is gone (or slow to fail). Every success refreshes the cache,
+  // so the offline copy tracks the latest build the device has seen.
   e.respondWith(
-    caches.match(req).then(function (hit) {
-      if (hit) return hit;
-      return fetch(req).then(function (res) {
-        // Cache same-origin successes we didn't know about up front (e.g. a
-        // file added without bumping ASSETS). Opaque cross-origin responses
-        // are left alone — there are none today by design.
-        if (res && res.status === 200 && res.type === 'basic') {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(req, copy); });
-        }
-        return res;
-      }).catch(function () {
-        // Offline and uncached: a navigation still gets the game shell so
-        // the player never sees a browser error page.
+    fetch(req).then(function (res) {
+      if (res && res.status === 200 && res.type === 'basic') {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(req, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(req).then(function (hit) {
+        if (hit) return hit;
+        // Offline and uncached: a navigation still gets the game shell so the
+        // player never sees a browser error page.
         if (req.mode === 'navigate') return caches.match('./toot-and-scoot.html');
         throw new Error('offline and not cached: ' + req.url);
       });
