@@ -1217,8 +1217,11 @@ document.addEventListener('keydown', function (e) {
     if (e.code === 'ArrowLeft') cyclePersona(kbi, -1);
     else if (e.code === 'ArrowRight') cyclePersona(kbi, 1);
     else if (e.code === 'ArrowDown') enterShared('kb');
-    else if (e.code === 'Enter') toggleReady(kbi);
-    else if (e.code === 'Backspace' || e.code === 'Escape') leaveSlot(kbi);
+    else if (e.code === 'Enter') { if (allReady()) tryStart(false); else toggleReady(kbi); }
+    else if (e.code === 'Backspace' || e.code === 'Escape') {
+      if (session.slots[kbi] && session.slots[kbi].ready) setReady(kbi, false);
+      else leaveSlot(kbi);
+    }
     return;
   }
   if (menuOpen) {
@@ -1522,7 +1525,12 @@ function animate() {
     cps.forEach(function (np) {
       if (running && !gameOver) return;   // a ready press this frame already started the game
       var pv = padJoinPrev[np.index] || {};
-      var face = Input.button(np, 0) || Input.button(np, 1) || Input.button(np, 2) || Input.button(np, 3);
+      // `face` (any of the four) still JOINS, so a kid's first press always does
+      // something. Once you hold a card the buttons are specific, because the
+      // on-screen hints now name them by letter and a hint that lies is worse
+      // than no hint at all.
+      var south = Input.button(np, 0), east = Input.button(np, 1);
+      var face = south || east || Input.button(np, 2) || Input.button(np, 3);
       var left = Input.button(np, 14) || np.axes[0] < -0.5;
       var right = Input.button(np, 15) || np.axes[0] > 0.5;
       var up = Input.button(np, 12) || np.axes[1] < -0.5;
@@ -1545,7 +1553,17 @@ function animate() {
       } else {
         if (left && !pv.left) cyclePersona(si, -1);
         if (right && !pv.right) cyclePersona(si, 1);
-        if (face && !pv.face) toggleReady(si);
+        // South readies you; once the WHOLE group is ready the same button is
+        // START (Otto's flow: everyone readies, then somebody starts). East is
+        // the way back out — un-ready if you are, leave the slot if you aren't.
+        if (south && !pv.south) {
+          if (allReady()) tryStart(true);
+          else toggleReady(si);
+        }
+        if (east && !pv.east) {
+          if (session.slots[si] && session.slots[si].ready) setReady(si, false);
+          else leaveSlot(si);
+        }
         if (view && !pv.view) leaveSlot(si);
         if (down && !pv.down) enterShared(np.index);   // drop onto the shared strip (ANY player)
         if (si === 0) {   // Player 1 keeps the quick shoulder shortcuts too
@@ -1555,7 +1573,8 @@ function animate() {
           if (up && !pv.up) showRules();
         }
       }
-      padJoinPrev[np.index] = { face: face, left: left, right: right, up: up, down: down, view: view, lb: lb, rb: rb, menu: menu };
+      padJoinPrev[np.index] = { face: face, south: south, east: east, left: left, right: right,
+        up: up, down: down, view: view, lb: lb, rb: rb, menu: menu };
     });
   }
   if (pad) {
@@ -2232,3 +2251,7 @@ if (padDebugStart) {
   var pdEl = document.getElementById('paddebug');
   if (pdEl) pdEl.style.display = 'block';
 }
+
+// Show the platform-specific bits (the Android app's "Exit game" rows). Runs
+// after ui.js has defined them and after the DOM exists.
+initPlatformUI();

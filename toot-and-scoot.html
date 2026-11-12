@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 <div id="overlay">
@@ -23,6 +23,7 @@
     <p class="setup-h">Who's playing?</p>
     <div id="playerslots"><!-- slot tiles rendered by renderSlots() --></div>
     <p class="setup-hint" id="joinhint">Press a face button on a controller to join. Each player picks a character with ◀ ▶ and hits <b>READY</b> — the game starts when everyone's ready! (Solo: join, then Ready.)</p>
+    <div id="sharedrows">
     <div class="setup-shared">
       <span class="shared-label">Mode:</span>
       <div id="gametyperow">
@@ -38,6 +39,7 @@
         <button class="brick-btn diffbtn" data-diff="2" onclick="pickDifficulty(2, event)">Hard</button>
       </div>
     </div>
+    </div>
     <div id="levelrow" style="display:none">
       <p style="margin:12px 0 2px">Start at level (boss fights on 5, 10, 15...):</p>
       <div id="levelbtns">
@@ -50,9 +52,19 @@
       </div>
     </div>
     <div id="padstatus" style="font-size:15px; margin:8px auto 0; max-width:600px; line-height:1.5; border-radius:8px; padding:2px 10px"></div>
+    <!-- Everyone readies on their own card, then somebody presses START. The
+         button is disabled (and says who we are waiting for) until the whole
+         group is ready. renderStartRow() in ui.js owns its text and state. -->
+    <div id="startrow">
+      <button id="startbtn" class="startbtn" onclick="tryStart(false, event)">START</button>
+      <div id="starthint" class="starthint"></div>
+    </div>
     <div id="rulesrow">
-      <button class="hatbtn" onclick="showRules(event)">How to play</button>
-      <button class="hatbtn" onclick="openHelp(); if(event){event.stopPropagation();}">Controller</button>
+      <button class="hatbtn" id="rulesbtn" onclick="showRules(event)">How to play</button>
+      <button class="hatbtn" id="helpbtn" onclick="openHelp(); if(event){event.stopPropagation();}">Controller</button>
+      <!-- Only shown inside the Android TV app, where there is otherwise no way
+           out except the Home button. ui.js unhides it. -->
+      <button class="hatbtn" id="exitbtn" style="display:none" onclick="exitApp(event)">Exit game</button>
     </div>
     <p style="font-size:13px; margin:6px 0 0; color:#90a4ae">Each player: ◀ ▶ pick character &middot; face button = ready &middot; <b>D-pad Down</b> = jump to Mode / Difficulty / How-to-play (◀ ▶ change, Up = back to your card) &middot; View/&minus; = leave.</p>
   </div>
@@ -163,7 +175,10 @@
   <div id="pausemsg" style="color:#ff8a65; font-size:15px; max-width:300px; margin:0 auto 8px"></div>
   <button class="mbtn" data-act="resume" onclick="menuAction('resume', false)">Resume game</button>
   <button class="mbtn" data-act="settings" onclick="menuAction('settings', false)">Settings</button>
-  <button class="mbtn" data-act="quit" onclick="menuAction('quit', false)">Quit</button>
+  <button class="mbtn" data-act="quit" onclick="menuAction('quit', false)">Quit to menu</button>
+  <!-- Android TV app only (ui.js unhides it): on a TV, Home leaves the game
+       running in the background and there is no other way out. -->
+  <button class="mbtn" id="exitgamebtn" data-act="exitapp" style="display:none" onclick="menuAction('exitapp', false)">Exit game</button>
 </div>
 <div id="settingsmenu" class="menu" style="display:none">
   <h2>Settings</h2>
@@ -178,16 +193,16 @@
      NOTE: every local script/stylesheet carries ?v=N. BUMP N on any change to
      css/ or js/ — without it a device running the service worker can keep
      serving a stale copy of a file whose URL never changed. -->
-<script src="vendor/three.r128.min.js?v=4"></script>
-<script src="js/constants.js?v=4"></script>
-<script src="js/theme.js?v=4"></script>
-<script src="js/audio.js?v=4"></script>
-<script src="js/meshes.js?v=4"></script>
-<script src="js/world.js?v=4"></script>
-<script src="js/fx.js?v=4"></script>
-<script src="js/input.js?v=4"></script>
-<script src="js/ui.js?v=4"></script>
-<script src="js/help.js?v=4"></script>
-<script src="js/main.js?v=4"></script>
+<script src="vendor/three.r128.min.js?v=5"></script>
+<script src="js/constants.js?v=5"></script>
+<script src="js/theme.js?v=5"></script>
+<script src="js/audio.js?v=5"></script>
+<script src="js/meshes.js?v=5"></script>
+<script src="js/world.js?v=5"></script>
+<script src="js/fx.js?v=5"></script>
+<script src="js/input.js?v=5"></script>
+<script src="js/ui.js?v=5"></script>
+<script src="js/help.js?v=5"></script>
+<script src="js/main.js?v=5"></script>
 </body>
 </html>

@@ -335,6 +335,42 @@
     .helptypebtn:hover { transform: none; }
   }
 
+  /* ---- START: the deliberate launch. Everyone readies on their card, then
+     somebody presses this. Disabled until the whole group is ready, and the
+     hint underneath names who we are still waiting on. ---- */
+  #startrow { margin: 8px 0 2px; }
+  .startbtn {
+    font-family: var(--type-display); font-size: 26px; letter-spacing: 2px;
+    color: #fff; border: 3px solid var(--ink); border-radius: 16px;
+    padding: 12px 54px; cursor: pointer;
+    background: linear-gradient(180deg, #6a7490 0%, #49516b 100%);
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 var(--gloss);
+    transition: transform var(--t-fast) ease, box-shadow var(--t-fast) ease,
+                background var(--t-pop) ease;
+  }
+  .startbtn:disabled { opacity: 0.55; cursor: default; }
+  .startbtn.on {
+    background: linear-gradient(180deg, var(--brick-green) 0%, var(--brick-green-lo) 100%);
+    animation: startPulse 1.1s ease-in-out infinite;
+  }
+  .startbtn.on:hover { transform: translateY(-2px); }
+  .startbtn.on:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45); }
+  @keyframes startPulse {
+    0%, 100% { box-shadow: 0 6px 0 rgba(0,0,0,0.45), inset 0 2px 0 var(--gloss), 0 0 0 0 rgba(87,185,58,0.55); }
+    50%      { box-shadow: 0 6px 0 rgba(0,0,0,0.45), inset 0 2px 0 var(--gloss), 0 0 22px 7px rgba(87,185,58,0.45); }
+  }
+  @media (prefers-reduced-motion: reduce) { .startbtn.on { animation: none; } }
+  .starthint { font-size: 14px; color: #b9c4e6; margin: 5px 0 0; min-height: 1.2em; }
+  .starthint b { color: var(--gold); }
+
+  /* Per-card button legend. The letters come from the pad's own type (see
+     lettersFor in ui.js) -- a Switch pad says B where an Xbox pad says A. */
+  .pcard-hint {
+    font-family: Arial, Helvetica, sans-serif; font-weight: bold;
+    font-size: 11px; color: #9fb0da; line-height: 1.3; margin: 1px 0 0;
+  }
+
   /* ===== Short viewports: TV =====================================
      An NVIDIA Shield on a 1080p TV gives the page about 1005x565 CSS pixels
      (1920x1080 at devicePixelRatio ~1.9) -- barely more than half the height
@@ -348,25 +384,38 @@
      ================================================================ */
   @media (max-height: 620px) {
     #overlay { padding: 6px 0; }
-    #overlay h1 { font-size: 30px; margin: 0 0 2px; -webkit-text-stroke-width: 1px; }
+    #overlay h1 { font-size: 24px; margin: 0 0 1px; -webkit-text-stroke-width: 1px; }
     /* The "Blast the toilet paper..." tagline is pure flavour; the How-to-play
        panel carries the real explanation. First to go when space is tight. */
     #overlay > p { display: none; }
     #bigmsg { font-size: 22px; margin-bottom: 3px; }
 
-    #diffbtns { padding: 8px 18px 10px; margin: 4px 12px; border-width: 3px; }
-    .setup-h { font-size: 14px; margin: 4px 0 3px; }
+    #diffbtns { padding: 5px 16px 7px; margin: 3px 12px; border-width: 3px; }
+    .setup-h { font-size: 12px; margin: 2px 0 2px; }
     .setup-hint { font-size: 11px; margin: 2px auto 4px; max-width: 620px; line-height: 1.3; }
     .setup-shared { margin: 2px 0; gap: 8px; }
     .shared-label { font-size: 12px; }
 
-    .pcard { min-height: 92px; width: 170px; padding: 6px 6px 7px; gap: 4px; }
-    #playerslots { gap: 8px; margin: 4px 0 2px; }
+    .pcard { min-height: 76px; width: 152px; padding: 4px 5px 5px; gap: 2px; }
+    #playerslots { gap: 6px; margin: 2px 0 1px; }
 
     .btn { font-size: 17px; padding: 7px 16px; margin: 4px; }
     .brick-btn { font-size: 15px; padding: 6px 12px; }
     .hatbtn { font-size: 14px; padding: 5px 12px; }
-    #padstatus { font-size: 13px; margin-top: 3px; }
+    #padstatus { font-size: 13px; margin-top: 2px; }
+    #startrow { margin: 3px 0 0; }
+    .startbtn { font-size: 19px; padding: 6px 30px; border-width: 2px; letter-spacing: 1px; }
+    .starthint { font-size: 11px; margin-top: 2px; }
+    .pcard-hint { font-size: 10px; }
+
+    /* The join paragraph is now redundant: every card and the join tile carry
+       their own button legend, in that pad's own letters. */
+    #joinhint { display: none; }
+    /* Mode and Difficulty share one row -- a whole row of vertical budget back,
+       and they read as the pair of settings they are. */
+    #sharedrows { display: flex; justify-content: center; align-items: center;
+                  flex-wrap: wrap; gap: 14px; }
+    #sharedrows .setup-shared { margin: 1px 0; }
     /* The long "Each player: pick character / ready / D-pad Down..." footnote.
        Same information lives on the How-to-play panel. */
     #diffbtns > p:last-child { display: none; }

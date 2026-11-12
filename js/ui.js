@@ -113,22 +113,73 @@ function allReady() {
 function resetReady() {
   session.slots.forEach(function (s) { s.ready = false; });
 }
+// Readying no longer launches the game. Otto's call: everyone gets ready,
+// THEN somebody presses START. The old auto-start made the lobby feel like it
+// ran away from you — the last player to ready never saw the menu again.
 function toggleReady(i) {
   var s = session.slots[i];
   if (!s) return;
   s.ready = !s.ready;
   snd(s.ready ? 820 : 300, 0.1, 'sine');
   renderSlots();
-  // Everyone ready -> GO. Start synchronously in the triggering handler so the
-  // keyboard/mouse gesture can grab pointer lock (needed for a keyboard player's
-  // mouse-look and, when no pad is present, for the control loop to run at all).
-  // Gamepad players don't need lock — their pad drives control regardless.
-  if (s.ready && allReady() && canStartGame()) {
-    snd(660, 0.1, 'sine'); snd(990, 0.16, 'sine');
-    startGame();
-    lockPointer();
-  }
+  if (s.ready && allReady()) { snd(660, 0.09, 'sine'); snd(990, 0.13, 'sine'); }
 }
+function setReady(i, val) {
+  var s = session.slots[i];
+  if (!s || s.ready === val) return;
+  toggleReady(i);
+}
+
+// THE start trigger. Every path into the game goes through here so the
+// canStartGame() guard can never be skipped (see CLAUDE.md invariants).
+function tryStart(fromPad, ev) {
+  if (ev) ev.stopPropagation();
+  if (!session.slots.length || !allReady()) { snd(140, 0.18, 'square'); return; }
+  if (!canStartGame()) {                       // a claimed pad went missing
+    snd(140, 0.2, 'square');
+    updatePadStatus();
+    return;
+  }
+  snd(660, 0.1, 'sine'); snd(990, 0.16, 'sine');
+  // Started synchronously in the triggering handler so a keyboard/mouse gesture
+  // can still grab pointer lock. Gamepad players never need it.
+  startGame();
+  if (!fromPad) lockPointer();
+}
+
+// ---- running as the Android TV app? -------------------------------------
+// Capacitor injects window.Capacitor and registers native plugins at runtime,
+// so this works without bundling anything into our plain ES5 scripts.
+function isNativeApp() {
+  return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App);
+}
+// On the TV there is otherwise no way out of the game but the Home button,
+// which leaves it running. Hidden entirely in a browser, where the tab IS the
+// exit and an app-quit button would be a lie.
+function exitApp(ev) {
+  if (ev) ev.stopPropagation();
+  if (!isNativeApp()) return;
+  snd(300, 0.12, 'sine');
+  try { window.Capacitor.Plugins.App.exitApp(); } catch (e) {}
+}
+function initPlatformUI() {
+  var native = isNativeApp();
+  ['exitbtn', 'exitgamebtn'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b) b.style.display = native ? '' : 'none';
+  });
+}
+// Which letters to print in hints. A button's POSITION is what the game reads
+// (see input.js); the LETTER printed on it differs by brand — south is "B" on a
+// Switch pad and "A" on an Xbox one. Showing the wrong letter on a TV is worse
+// than showing none, so every hint asks the actual pad.
+function lettersFor(slot) {
+  if (slot && slot.kind === 'kb') return null;
+  var np = slot ? padByIndex(slot.padIndex) : (Input.pads()[0] || null);
+  return Input.LETTERS[(np && np.type) || 'xbox'];
+}
+function lobbyLetters() { return lettersFor(null); }
+
 function renderSlots() {
   var host = document.getElementById('playerslots');
   if (!host) return;
@@ -137,6 +188,13 @@ function renderSlots() {
     var pr = PERSONAS[s.persona];
     var col = hexCss(pr.color);
     var ro = s.ready ? ' disabled' : '';
+    var L = lettersFor(s);
+    var readyKey = L ? L.south : 'Enter';
+    var backKey = L ? L.east : 'Esc';
+    // Spell out what each button does, on the card, in that pad's own letters.
+    var hintLine = s.ready
+      ? backKey + ' = not ready'
+      : '&#9664; &#9654; character &middot; ' + readyKey + ' = ready';
     html += '<div class="pcard' + (s.ready ? ' ready' : '') + '" style="border-color:' + col + '">' +
       '<div class="pcard-top"><span class="pcard-num" style="color:' + col + '">Player ' + (i + 1) + '</span>' +
       '<span class="pcard-dev">' + padTypeLabel(s) + '</span></div>' +
@@ -147,13 +205,15 @@ function renderSlots() {
         '<button class="pcard-arrow" onclick="cyclePersona(' + i + ',1);event.stopPropagation();"' + ro + '>&#9654;</button>' +
       '</div>' +
       '<button class="pcard-ready" onclick="toggleReady(' + i + ');event.stopPropagation();">' +
-        (s.ready ? '&#10003; READY!' : 'Press to READY') + '</button>' +
+        (s.ready ? '&#10003; READY!' : 'Press ' + readyKey + ' to READY') + '</button>' +
+      '<div class="pcard-hint">' + hintLine + '</div>' +
       '<button class="pcard-leave" onclick="leaveSlot(' + i + ');event.stopPropagation();">&#10005; leave</button>' +
       '</div>';
   });
   if (session.slots.length < MAX_SLOTS) {
+    var JL = lobbyLetters();
     html += '<div class="pcard join"><div class="pcard-plus">+</div>' +
-      '<div class="pcard-dev">Press a face button<br>on a controller to join</div></div>';
+      '<div class="pcard-dev">Press <b>' + JL.south + '</b> on a<br>controller to join</div></div>';
     if (session.slots.length === 0) {
       html += '<button class="pcard kbjoin" onclick="joinKeyboard(event)">' +
         '<div class="pcard-plus">&#9000;</div><div class="pcard-dev">Play with<br>keyboard</div></button>';
@@ -163,9 +223,34 @@ function renderSlots() {
   // numPlayers reflects claimed players live (min 1 — solo default)
   numPlayers = Math.max(1, session.slots.length);
   var hint = document.getElementById('joinhint');
-  if (hint) hint.style.display = session.slots.length ? 'none' : 'block';
+  // '' not 'block': an inline style would beat the TV media query that hides
+  // this paragraph entirely (the cards carry their own button legend there).
+  if (hint) hint.style.display = session.slots.length ? 'none' : '';
   refreshSharedSelected();
+  renderStartRow();
   updatePadStatus();
+}
+
+// START is deliberately a separate, deliberate press — see toggleReady.
+// It also says WHO it is waiting for, because "nothing happens" on a TV with
+// three kids and one pad not yet readied is the worst possible feedback.
+function renderStartRow() {
+  var btn = document.getElementById('startbtn');
+  var hint = document.getElementById('starthint');
+  if (!btn || !hint) return;
+  var L = lobbyLetters();
+  var ready = allReady();
+  btn.classList.toggle('on', ready);
+  btn.disabled = !ready;
+  if (!session.slots.length) {
+    hint.innerHTML = 'Join with a controller to begin';
+  } else if (!ready) {
+    var waiting = [];
+    session.slots.forEach(function (s, i) { if (!s.ready) waiting.push('Player ' + (i + 1)); });
+    hint.innerHTML = 'Waiting for ' + waiting.join(' and ') + ' to get ready';
+  } else {
+    hint.innerHTML = 'Everyone’s ready &mdash; press <b>' + L.south + '</b> to START!';
+  }
 }
 function slotOfKb() {
   for (var i = 0; i < session.slots.length; i++) if (session.slots[i].kind === 'kb') return i;
@@ -204,15 +289,19 @@ function refreshSharedSelected() {
 // is on their card. Only one owner at a time — a single global cursor.
 var sharedOwner = null, sharedIdx = 0;
 function sharedTargets() {
-  // nav order top→bottom; el is the element the gold ring wraps
-  var rr = document.getElementById('rulesrow');
-  var rb = rr ? rr.querySelectorAll('button') : [];
-  return [
+  // nav order top→bottom; el is the element the gold ring wraps.
+  // START is FIRST on purpose: D-pad Down from a card should land on the thing
+  // you most likely want, and it makes the button discoverable without a hunt.
+  var t = [
+    { el: document.getElementById('startbtn'), kind: 'start' },
     { el: document.getElementById('gametyperow'), kind: 'mode' },
     { el: document.getElementById('diffrow'), kind: 'diff' },
-    { el: rb[0] || null, kind: 'rules' },
-    { el: rb[1] || null, kind: 'help' }
+    { el: document.getElementById('rulesbtn'), kind: 'rules' },
+    { el: document.getElementById('helpbtn'), kind: 'help' }
   ];
+  // Exit only exists inside the app; in a browser it would be a dead row.
+  if (isNativeApp()) t.push({ el: document.getElementById('exitbtn'), kind: 'exit' });
+  return t;
 }
 function renderSharedFocus() {
   var t = sharedTargets();
@@ -229,19 +318,29 @@ function sharedMove(d) {
   if (sharedOwner === null) return;
   var n = sharedIdx + d;
   if (n < 0) { exitShared(); return; }          // up past the top -> back to the card
-  if (n > 3) return;                             // clamp at the bottom
+  if (n > sharedTargets().length - 1) return;   // clamp at the bottom
   sharedIdx = n; snd(520, 0.04, 'sine'); renderSharedFocus();
+}
+// Keyed by kind, not index, so adding a row (START, Exit) can't silently
+// re-point Left/Right at the wrong setting.
+function sharedKind() {
+  var t = sharedTargets()[sharedIdx];
+  return t ? t.kind : null;
 }
 function sharedAdjust(dir) {
   if (sharedOwner === null) return;
-  if (sharedIdx === 0) { pickGameType(coop ? 'ffa' : 'coop'); snd(520, 0.05, 'sine'); }
-  else if (sharedIdx === 1) cycleDifficulty(dir);   // cycleDifficulty already beeps
+  var k = sharedKind();
+  if (k === 'mode') { pickGameType(coop ? 'ffa' : 'coop'); snd(520, 0.05, 'sine'); }
+  else if (k === 'diff') cycleDifficulty(dir);      // cycleDifficulty already beeps
 }
 function sharedActivate() {
   if (sharedOwner === null) return;
-  if (sharedIdx === 2) showRules();
-  else if (sharedIdx === 3) openHelp();
-  else sharedAdjust(1);                            // Mode/Difficulty: face nudges forward
+  var k = sharedKind();
+  if (k === 'start') tryStart(true);
+  else if (k === 'rules') showRules();
+  else if (k === 'help') openHelp();
+  else if (k === 'exit') exitApp();
+  else sharedAdjust(1);                             // Mode/Difficulty: face nudges forward
 }
 
 // ---- rules panel ----
@@ -556,7 +655,11 @@ function canStartGame() {
 
 function menuButtons() {
   var el = menuScreen === 'pause' ? pausemenuEl : settingsEl;
-  return Array.prototype.slice.call(el.querySelectorAll('.mbtn'));
+  // Hidden rows are skipped: "Exit game" exists only in the Android app, and a
+  // navigable-but-invisible row reads as the menu being broken.
+  return Array.prototype.slice.call(el.querySelectorAll('.mbtn')).filter(function (b) {
+    return b.style.display !== 'none';
+  });
 }
 function renderMenu() {
   pausemenuEl.style.display = menuOpen && menuScreen === 'pause' ? 'block' : 'none';
@@ -587,7 +690,8 @@ function menuAction(act, fromPad) {
     // before any press can fire again (see controlHuman / spectate)
     humans().forEach(function (h) { h.suppress = true; h.prevBomb = true; h.prevUse = true; h.prevMask = true; });
     if (!fromPad) lockPointer();
-  } else if (act === 'settings') { menuScreen = 'settings'; menuIndex = 0; renderMenu(); }
+  } else if (act === 'exitapp') exitApp();
+  else if (act === 'settings') { menuScreen = 'settings'; menuIndex = 0; renderMenu(); }
   else if (act === 'back') { menuScreen = 'pause'; menuIndex = 1; renderMenu(); }
   else if (act === 'quit') {
     closeMenus();
