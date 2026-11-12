@@ -1,11 +1,10 @@
 /* Toot and Scoot service worker — makes the installed game work with no
    internet at all.
 
-   The whole game is ~870 KB of static files with no fetch() calls and no
-   backend, so the strategy is the simplest one that works: precache
-   everything on install, then serve cache-first forever. Nothing here is
-   needed to PLAY on a dev machine — js/main.js only registers this worker
-   on https, so `play.py` live-reload is never fighting a cache.
+   The whole game is ~1 MB of static files with no fetch() calls and no
+   backend, so everything is precached on install. Nothing here is needed to
+   PLAY on a dev machine — js/main.js only registers this worker on https, so
+   `play.py` live-reload is never fighting a cache.
 
    STRATEGY: network-first for same-origin GETs, falling back to the cache.
    It started out cache-first, which was wrong for a game under active
