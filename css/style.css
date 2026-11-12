@@ -26,6 +26,11 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; z-index: 10; cursor: pointer;
     overflow-y: auto; padding: 20px 0;
+    /* 'safe' matters: with plain `center`, content taller than the viewport is
+       pushed ABOVE the scroll area and can never be reached (measured on the
+       Shield: the wordmark sat at top:-84px). `safe center` centers when it
+       fits and falls back to flex-start when it doesn't. */
+    justify-content: safe center;
   }
   /* Chunky LEGO wordmark: fat outlined display type, gold with a heavy dark
      edge, tipped a hair so it feels hand-placed. */
@@ -328,4 +333,41 @@
   @media (prefers-reduced-motion: reduce) {
     .helptypebtn { transition: none; }
     .helptypebtn:hover { transform: none; }
+  }
+
+  /* ===== Short viewports: TV =====================================
+     An NVIDIA Shield on a 1080p TV gives the page about 1005x565 CSS pixels
+     (1920x1080 at devicePixelRatio ~1.9) -- barely more than half the height
+     a laptop window has. The lobby measured 721px tall there, so the wordmark
+     scrolled off the top and the How-to-play / Controller buttons clipped off
+     the bottom, with no comfortable way to scroll using a gamepad.
+
+     This trims ~265px of vertical padding, type and decoration so the whole
+     lobby fits on screen at once. Keep it measurable: `python
+     tools/measure_tv.py` reports the real numbers at TV viewports.
+     ================================================================ */
+  @media (max-height: 620px) {
+    #overlay { padding: 6px 0; }
+    #overlay h1 { font-size: 30px; margin: 0 0 2px; -webkit-text-stroke-width: 1px; }
+    /* The "Blast the toilet paper..." tagline is pure flavour; the How-to-play
+       panel carries the real explanation. First to go when space is tight. */
+    #overlay > p { display: none; }
+    #bigmsg { font-size: 22px; margin-bottom: 3px; }
+
+    #diffbtns { padding: 8px 18px 10px; margin: 4px 12px; border-width: 3px; }
+    .setup-h { font-size: 14px; margin: 4px 0 3px; }
+    .setup-hint { font-size: 11px; margin: 2px auto 4px; max-width: 620px; line-height: 1.3; }
+    .setup-shared { margin: 2px 0; gap: 8px; }
+    .shared-label { font-size: 12px; }
+
+    .pcard { min-height: 92px; width: 170px; padding: 6px 6px 7px; gap: 4px; }
+    #playerslots { gap: 8px; margin: 4px 0 2px; }
+
+    .btn { font-size: 17px; padding: 7px 16px; margin: 4px; }
+    .brick-btn { font-size: 15px; padding: 6px 12px; }
+    .hatbtn { font-size: 14px; padding: 5px 12px; }
+    #padstatus { font-size: 13px; margin-top: 3px; }
+    /* The long "Each player: pick character / ready / D-pad Down..." footnote.
+       Same information lives on the How-to-play panel. */
+    #diffbtns > p:last-child { display: none; }
   }

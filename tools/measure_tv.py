@@ -26,7 +26,10 @@ import threading
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 8797
 PAGE = "_measure.html"
-SIZES = [(1920, 1080), (1280, 720), (3840, 2160)]
+# CSS-pixel viewports, not physical. The Shield reports roughly
+# 1005x565 CSS px (1920x1080 at devicePixelRatio ~1.9), which is the
+# size that actually has to fit. The others are sanity checks.
+SIZES = [(1005, 565), (1280, 720), (1920, 1080)]
 
 CHROME_CANDIDATES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -107,9 +110,9 @@ def main():
                      "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
                      "--no-sandbox", "--user-data-dir=" + prof,
                      "--window-size=%d,%d" % (w, h),
-                     "--virtual-time-budget=8000", "--dump-dom",
+                     "--virtual-time-budget=5000", "--dump-dom",
                      "http://127.0.0.1:%d/%s" % (PORT, PAGE)],
-                    capture_output=True, text=True, timeout=120).stdout
+                    capture_output=True, text=True, timeout=90).stdout
             finally:
                 shutil.rmtree(prof, ignore_errors=True)
 

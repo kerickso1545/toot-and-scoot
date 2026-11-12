@@ -42,7 +42,10 @@ def html_refs():
     """Files toot-and-scoot.html pulls in via src= / href= (local only)."""
     src = open(os.path.join(ROOT, "toot-and-scoot.html"), encoding="utf-8").read()
     refs = re.findall(r'(?:src|href)="([^"]+)"', src)
-    return [r for r in refs if not r.startswith(("http:", "https:", "//", "#"))]
+    refs = [r for r in refs if not r.startswith(("http:", "https:", "//", "#"))]
+    # Strip the ?v=N cache-busting stamp: sw.js precaches the bare paths and
+    # matches with ignoreSearch, so a versioned ref is NOT a missing asset.
+    return [r.split("?")[0] for r in refs]
 
 
 def main():
