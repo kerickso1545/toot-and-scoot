@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
 <div id="overlay">
@@ -174,17 +174,20 @@
 </div>
 <div id="paddebug" style="display:none"></div>
 
-<!-- Three.js r128, vendored locally (MIT) so the game needs no internet at all -->
-<script src="vendor/three.r128.min.js"></script>
-<script src="js/constants.js"></script>
-<script src="js/theme.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/meshes.js"></script>
-<script src="js/world.js"></script>
-<script src="js/fx.js"></script>
-<script src="js/input.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/help.js"></script>
-<script src="js/main.js"></script>
+<!-- Three.js r128, vendored locally (MIT) so the game needs no internet at all.
+     NOTE: every local script/stylesheet carries ?v=N. BUMP N on any change to
+     css/ or js/ — without it a device running the service worker can keep
+     serving a stale copy of a file whose URL never changed. -->
+<script src="vendor/three.r128.min.js?v=3"></script>
+<script src="js/constants.js?v=3"></script>
+<script src="js/theme.js?v=3"></script>
+<script src="js/audio.js?v=3"></script>
+<script src="js/meshes.js?v=3"></script>
+<script src="js/world.js?v=3"></script>
+<script src="js/fx.js?v=3"></script>
+<script src="js/input.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/help.js?v=3"></script>
+<script src="js/main.js?v=3"></script>
 </body>
 </html>

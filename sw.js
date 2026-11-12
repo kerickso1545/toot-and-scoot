@@ -16,7 +16,7 @@
 
    WHEN YOU ADD OR RENAME A GAME FILE: add it to ASSETS and bump CACHE. */
 
-var CACHE = 'toot-and-scoot-v2';
+var CACHE = 'toot-and-scoot-v3';
 
 var ASSETS = [
   './',
@@ -80,7 +80,10 @@ self.addEventListener('fetch', function (e) {
       }
       return res;
     }).catch(function () {
-      return caches.match(req).then(function (hit) {
+      // ignoreSearch: the page loads its scripts with a ?v=N cache-busting
+      // stamp, but ASSETS precaches the bare paths. Without this, going
+      // offline after a version bump would miss every single file.
+      return caches.match(req, { ignoreSearch: true }).then(function (hit) {
         if (hit) return hit;
         // Offline and uncached: a navigation still gets the game shell so the
         // player never sees a browser error page.
