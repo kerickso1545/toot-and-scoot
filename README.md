@@ -1,28 +1,55 @@
-# Otto's Games
+# Toot and Scoot
 
-Games designed by Otto, built with Claude.
+A 3D fart-battle arena game in a bathroom-themed maze, designed by Otto and
+built with Claude. Blast the toilet paper, out-toot your rivals, and be the
+last one standing!
 
-## Toot and Scoot (`toot-and-scoot.html`)
+## Play it on the TV (NVIDIA Shield)
 
-A 3D fart-battle arena game in a bathroom-themed maze. **To play:
-double-click `play.py`** — it starts a tiny local server and opens the game
+This is the way Otto can play whenever he wants, with no laptop involved.
+One-time setup per device, then it's just an icon on the Shield:
+
+1. On the Shield, install a Chromium-based browser (there is no preinstalled
+   browser on Shield TV — sideload Chrome, or use TV Bro / Puffin TV).
+2. Go to **kerickso1545.github.io/toot-and-scoot/**
+3. Use the browser's **Install app / Add to Home screen** option.
+4. Launch it from the Shield's apps row. It runs fullscreen, and **after the
+   first launch it needs no internet at all** — the whole game is cached on
+   the device.
+5. Pair your controllers to the Shield in Settings (it handles up to four;
+   the game seats three players).
+
+If controllers don't show up, press **C** on the title screen for the
+Controller Check readout and send it to Kevin — that tells us whether the pad
+is invisible to the browser or just mapped oddly.
+
+> **Why not just point the Shield at a laptop on the wifi?** Because browsers
+> only hand the Gamepad API to secure origins. A `http://192.168.x.x` address
+> is not one, so the game would load perfectly and no controller would do
+> anything at all. Hence the installed-app route.
+
+## Play it on a computer
+
+**Double-click `play.py`** — it starts a tiny local server and opens the game
 in your browser automatically (keep the console window open while playing;
-press ESC or close it to stop). Other devices on your wifi can play too —
-the console prints the address to type into their browser (each device
-keeps its own high scores; Windows Firewall may ask to allow Python once). It also live-reloads the page whenever a
-game file changes — waiting politely until you're back at the title screen
-if a match is running. Needs Python 3 installed, and internet the first time to
-load the Three.js library. Opening `toot-and-scoot.html` directly also still
-works, but the high-score leaderboard is saved separately per method — stick
-with `play.py`. Best played with Bluetooth/USB controllers; keyboard + mouse
-also fully supported.
+press ESC or close it to stop). It also live-reloads the page whenever a game
+file changes — waiting politely until you're back at the title screen if a
+match is running. Needs Python 3 installed; **no internet required**, since
+Three.js is vendored in `vendor/`.
+
+Other devices on your wifi can load it too (the console prints the address),
+but see the warning above — controllers will not work over a LAN address.
+Each device keeps its own high scores.
 
 **Boss mode**: `python play.py --boss` adds a "Start at level" picker to the
 main menu (1 / 5 / 10 / 15 / 20 / 25 — bosses are every 5th level, and higher
 levels are harder, just like getting there the long way). `--level N` also
 still works to set a start level directly without the picker.
 
-### Modes
+Best played with Bluetooth/USB controllers; keyboard + mouse also fully
+supported.
+
+## Modes
 - **1 player** — level campaign with rising difficulty, scoring, and a
   persistent local leaderboard (top 10, classic 3-initial entry; every entry
   shows the difficulty it was earned on)
@@ -42,7 +69,7 @@ still works to set a start level directly without the picker.
     tally and score.
 - Knocked-out players **spectate** (A cycles who you watch)
 
-### Controls
+## Controls
 | Action | Controller | Keyboard |
 |---|---|---|
 | Move | left stick | WASD |
@@ -63,7 +90,7 @@ and **Up** from the top row jumps back to your card. Any player can do this, not
 just Player 1. (Keyboard: arrows pick character, Enter readies, Down reaches the
 shared row; the mouse can click anything directly.)
 
-### Core mechanics
+## Core mechanics
 - Farts linger, then spread fast in four directions; blasts punch through
   crates but stop at walls. Your own farts never set each other off (Extra
   Gas double-toots keep their own fuses) — but a rival's fart caught in your
@@ -119,10 +146,12 @@ shared row; the mouse can click anything directly.)
   (1P/2P), stamina bar, boss bar; in split screen every player tile matches
   the 1P panel look, and level/difficulty/rivals get their own game tile
 
-### Tech notes
+## Tech notes
 - Plain HTML/CSS/JS files (no build step): `toot-and-scoot.html` shell +
-  `css/style.css` + eight `js/*.js` scripts loaded in order; Three.js r128
-  from CDN; Web Audio API for all sound (synthesized fart voices per
+  `css/style.css` + ten `js/*.js` scripts loaded in order; Three.js r128
+  vendored locally (no external references anywhere — the game is fully
+  self-contained at about 1 MB); a service worker (`sw.js`) precaches
+  everything so the installed app plays offline; Web Audio API for all sound (synthesized fart voices per
   character); Gamepad API; localStorage for the leaderboard
 - All five themes drawn procedurally in code (canvas textures) — porcelain
   tile, mossy sewer brick, caution stripes, marble and gold, and themed
@@ -131,12 +160,14 @@ shared row; the mouse can click anything directly.)
 - Fart clouds are a pooled particle system; floors and walls render as
   instanced meshes so 3-player split screen stays fast
 
-## Older prototypes
-
-- `boom-bots-arena.html` — the original 2D top-down bomb arena
-- `ottos-block-world.html` — first-person 3D block building demo
-
 ## Development
 
-Built iteratively in Claude Cowork sessions — Otto designs, Claude implements.
-See `activitylog.md` and the git history for the feature-by-feature story.
+Built iteratively in Claude sessions — Otto designs, Claude implements.
+See `activitylog.md` and the git history for the feature-by-feature story,
+`ARCHITECTURE.md` for the code map, and `DESIGN-DECISIONS.md` for why things
+are the way they are.
+
+This game used to live in the `otto-games` repo alongside other experiments;
+it was split out (with its history) in November 2026 so it could be developed
+and shipped on its own. `otto-games` still holds lake-town, chess-coach, and
+the frozen 2D/3D prototypes.

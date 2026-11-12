@@ -178,7 +178,9 @@ respect these unless Kevin explicitly changes them.
   stable (changing it would wipe high scores). One-time cost: scores from the
   `file://` era don't carry over.
 - Public/remote hosting (GitHub Pages, Tailscale) considered and deferred —
-  local server is enough for now.
+  local server is enough for now. **REVERSED 2026-11-11** — see
+  "Couch play on the NVIDIA Shield" below. A LAN URL cannot carry
+  controllers, which forces HTTPS hosting.
 - **LAN play (2026-07-22, Kevin)**: server binds 0.0.0.0 so other devices on
   the home network can open the game; console prints the LAN URL. The host
   computer still opens 127.0.0.1 so ITS leaderboard origin never changes;
@@ -187,6 +189,58 @@ respect these unless Kevin explicitly changes them.
 - **No build step remains sacred**: plain files served as-is,
   edit-and-refresh. Multi-file and local assets are allowed but not required;
   procedural-in-code stays the default aesthetic and workflow.
+
+## Couch play on the NVIDIA Shield (2026-11-11)
+
+The goal Kevin set: Otto should be able to play with his friends whenever he
+wants, without Kevin carrying a laptop into the den and hooking it to the TV.
+
+- **The constraint that drives everything: the Gamepad API requires a secure
+  context.** Chromium restricted it in Chrome 86 (Firefox 81). `https://` and
+  `http://localhost` qualify; **a LAN IP over plain HTTP does not** —
+  `navigator.getGamepads()` silently returns an empty array. So the obvious
+  plan (run `play.py` on a dev box, point the Shield's browser at
+  `http://192.168.x.x:8765`) fails in the worst possible way: the game loads
+  and looks perfect, and no controller does anything. This was already
+  discovered once during the Stage 1 controller recon and then lost in the
+  activity log; it is recorded here so it stays found.
+- **Therefore: no server at playtime.** The game is pure static files with no
+  `fetch` and no backend, so it is delivered as an *installed app* instead of
+  a page served from somebody's machine. `play.py` stays, as a dev tool only.
+- **Three.js is vendored** (`vendor/three.r128.min.js`) rather than pulled from
+  cdnjs. The CDN tag was the only external reference in the game; removing it
+  is what makes true offline play possible.
+- **PWA first, APK later.** GitHub Pages gives an HTTPS origin for free, and a
+  manifest + service worker make the game installable with its own icon,
+  fullscreen, and fully offline after first load. A Capacitor APK (whose
+  Android WebView origin is `https://localhost`, also a secure context) is the
+  nicer end state — a real Android TV app — but it is gated on confirming that
+  Android's WebView exposes the Gamepad API at all. The PWA route proves the
+  controllers work on Shield hardware first, which de-risks the APK.
+- **Service worker registers on HTTPS only.** `play.py` serves
+  `http://127.0.0.1`, which IS a secure context and WOULD register — but a
+  cache-first worker there would fight live reload and serve a stale game after
+  every edit. Prod is https, dev is http; the protocol check separates them.
+- **`index.html` is a redirect to `toot-and-scoot.html`.** Typing a URL on a TV
+  with a remote is miserable, so the address is as short as possible. The game
+  keeps its real filename — `play.py`, the docs and the git history all point
+  at it.
+- **Player cap stays at 3** (Kevin, 2026-11-11), even though a Shield pairs up
+  to 4 controllers. Lifting it means a `player4` global through the
+  humans/isHuman/carryStats paths and giving up the bird's-eye camera that
+  currently owns the 3P fourth quadrant. Revisit only if Otto asks.
+- **One-time cost:** a new origin means a fresh `localStorage`, so the existing
+  high-score leaderboard does not travel. Same tradeoff as the `file://` → HTTP
+  move.
+
+## Its own repository (2026-11-11)
+
+Toot and Scoot moved out of `otto-games` into its own repo. Rationale: it is
+the game that is actually being played and extended, and Kevin wants it treated
+separately from the other experiments (lake-town, chess-coach, the frozen 2D/3D
+prototypes). History was carried over with `git-filter-repo` keeping only the
+game's paths, so the full 76-commit story survives; `otto-games` keeps
+everything else unchanged.
 
 ## Rejected / reverted ideas (don't resurrect without asking)
 - Online multiplayer (out of scope for a single file).
