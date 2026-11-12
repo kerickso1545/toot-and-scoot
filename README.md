@@ -112,13 +112,24 @@ supported.
 | Menus | d-pad + A | arrows + Enter |
 
 **In the character-select lobby:** press a face button on a controller to join
-the next player slot, then **◀ ▶ pick your character** and a face button to
-**READY** (the game starts once everyone's ready). To reach the shared **Mode**,
-**Difficulty**, and **How to play** options, press **D-pad Down** to hop from
-your card onto that row — ◀ ▶ change the setting, **Down/Up** move between rows,
-and **Up** from the top row jumps back to your card. Any player can do this, not
-just Player 1. (Keyboard: arrows pick character, Enter readies, Down reaches the
-shared row; the mouse can click anything directly.)
+the next player slot. Then:
+
+| | Controller | Keyboard |
+|---|---|---|
+| Pick your character | ◀ ▶ | arrows |
+| Get **READY** | south (**B** on Switch, **A** on Xbox) | Enter |
+| Un-ready / leave | east (**A** on Switch, **B** on Xbox) | Esc |
+| Mode / Difficulty / How to play / Exit | **D-pad Down**, then ◀ ▶ | Down, then arrows |
+| **START** | south, once everyone is ready | Enter |
+
+Everyone readies on their own card, then somebody presses **START** — it stays
+greyed out until the whole group is ready, and tells you which player it's
+still waiting on. Any player can reach the shared settings row, not just
+Player 1; **Up** from the top of that row goes back to your card.
+
+Every on-screen hint names the button **as it is labelled on your own
+controller** — a Switch pad is told to press B where an Xbox pad is told to
+press A. The mouse can still click anything directly.
 
 ## Core mechanics
 - Farts linger, then spread fast in four directions; blasts punch through
