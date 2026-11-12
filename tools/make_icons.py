@@ -11,7 +11,7 @@ Drawn at 4x and downsampled for clean edges (PIL has no antialiased draw).
 """
 import os
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(os.path.dirname(HERE), "icons")
@@ -104,6 +104,51 @@ def draw_icon(px, safe=1.0):
     return img.resize((px, px), Image.LANCZOS)
 
 
+
+# Android TV banner: the tile the Shield home screen shows for the app.
+# 320x180 is the size Android asks for (android:banner in the manifest).
+BANNER_FONTS = [
+    "C:/Windows/Fonts/ariblk.ttf",    # Arial Black - matches the game wordmark
+    "C:/Windows/Fonts/arialbd.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
+
+
+def _font(px):
+    for f in BANNER_FONTS:
+        if os.path.exists(f):
+            try:
+                return ImageFont.truetype(f, px)
+            except OSError:
+                pass
+    return ImageFont.load_default()
+
+
+def draw_banner(w=320, h=180):
+    """Cloud on the left, wordmark on the right -- readable as a small tile."""
+    s = SS
+    img = gradient(max(w, h) * s, PANEL_TOP, PANEL_BOT).resize((w * s, h * s))
+    d = ImageDraw.Draw(img)
+
+    # Gas cloud, left third.
+    cx, cy, r = w * s * 0.20, h * s * 0.54, h * s * 0.21
+    glow = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+    cloud(ImageDraw.Draw(glow), cx, cy, r * 1.25, (87, 185, 58, 110))
+    img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(h * s * 0.03)))
+    cloud(d, cx, cy, r, GREEN, outline=INK, width=int(h * s * 0.014))
+    cloud(d, cx - r * 0.16, cy - r * 0.30, r * 0.52, GREEN_HI)
+
+    # Wordmark, right two thirds, stacked so it stays large.
+    f = _font(int(h * s * 0.19))
+    x = w * s * 0.40
+    for i, word in enumerate(("TOOT", "AND", "SCOOT")):
+        y = h * s * (0.19 + i * 0.235)
+        d.text((x + s * 2, y + s * 2), word, font=f, fill=INK)        # drop shadow
+        d.text((x, y), word, font=f, fill=GOLD)
+
+    return img.resize((w, h), Image.LANCZOS)
+
+
 def main():
     if not os.path.isdir(OUT):
         os.makedirs(OUT)
@@ -115,6 +160,10 @@ def main():
     # Maskable: art pulled into the inner ~70% so a circle crop is safe.
     p = os.path.join(OUT, "icon-maskable-512.png")
     draw_icon(512, safe=0.72).save(p, "PNG", optimize=True)
+    made.append(p)
+
+    p = os.path.join(OUT, "tv-banner.png")
+    draw_banner().save(p, "PNG", optimize=True)
     made.append(p)
 
     for p in made:

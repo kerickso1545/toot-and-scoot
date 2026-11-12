@@ -1,0 +1,14 @@
+# Dependencies and staged copies — all regenerable.
+node_modules/
+www/
+
+# Machine-specific: points at wherever this box keeps the Android SDK.
+android/local.properties
+
+# Gradle build output and caches.
+android/build/
+android/app/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
+*.apk
+*.aab

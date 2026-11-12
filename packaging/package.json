@@ -1,0 +1,17 @@
+{
+  "name": "toot-and-scoot-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android TV packaging for Toot and Scoot. The game itself lives at the repo root as plain files with no build step; this folder only wraps a copy of them in a WebView app.",
+  "scripts": {
+    "sync": "node sync-www.js && cap sync android",
+    "apk": "node sync-www.js && cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

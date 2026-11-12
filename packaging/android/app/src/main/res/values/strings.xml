@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Toot and Scoot</string>
+    <string name="title_activity_main">Toot and Scoot</string>
+    <string name="package_name">com.kerickson.tootandscoot</string>
+    <string name="custom_url_scheme">com.kerickson.tootandscoot</string>
+</resources>

@@ -2209,7 +2209,13 @@ window.addEventListener('resize', function () {
 // would fight play.py's live reload and serve Otto a stale game after every
 // edit. Production (GitHub Pages) is https, dev is http, so this one check
 // cleanly separates them.
-if (location.protocol === 'https:' && 'serviceWorker' in navigator) {
+// The hostname check excludes the Android app: Capacitor serves the bundled
+// copy from https://localhost, which IS https, so the worker would register
+// and start caching files that are already on the device — adding a stale-copy
+// risk to app updates for no benefit. Pages (the real https origin) still gets
+// offline support; play.py (http) and the APK (localhost) both opt out.
+if (location.protocol === 'https:' && location.hostname !== 'localhost' &&
+    'serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function (e) {
       console.warn('Service worker registration failed (offline play unavailable):', e);

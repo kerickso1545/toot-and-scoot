@@ -1,0 +1,12 @@
+{
+  "appId": "com.kerickson.tootandscoot",
+  "appName": "Toot and Scoot",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#131a38"
+  }
+}
