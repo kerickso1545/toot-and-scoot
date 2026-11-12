@@ -2198,3 +2198,21 @@ window.addEventListener('resize', function () {
   setAspects();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// ---- Installed-app support (PWA) -------------------------------------------
+// Registering the service worker is what lets the game be installed on the
+// NVIDIA Shield (and any phone/tablet) with its own icon and play with no
+// internet. See sw.js.
+//
+// HTTPS ONLY, on purpose: play.py serves dev over http://127.0.0.1, which IS a
+// secure context and WOULD allow registration — but a cache-first worker there
+// would fight play.py's live reload and serve Otto a stale game after every
+// edit. Production (GitHub Pages) is https, dev is http, so this one check
+// cleanly separates them.
+if (location.protocol === 'https:' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function (e) {
+      console.warn('Service worker registration failed (offline play unavailable):', e);
+    });
+  });
+}
