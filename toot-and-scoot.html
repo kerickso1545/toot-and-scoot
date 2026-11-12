@@ -2,7 +2,15 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Toot and Scoot</title>
+<!-- Installable web app (see manifest.webmanifest + sw.js): on a TV this is
+     what gives Toot and Scoot its own icon, fullscreen, and offline play. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#131a38">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -166,7 +174,8 @@
 </div>
 <div id="paddebug" style="display:none"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Three.js r128, vendored locally (MIT) so the game needs no internet at all -->
+<script src="vendor/three.r128.min.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/audio.js"></script>
