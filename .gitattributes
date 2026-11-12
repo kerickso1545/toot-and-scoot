@@ -1,0 +1,14 @@
+# Keep line endings stable no matter which machine touches the repo (Kevin's
+# Windows box, the Linux box, GitHub Pages, and whatever packages the APK
+# later). Without this, Windows checkouts rewrite every file to CRLF and the
+# diffs become unreadable.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Vendored library — keep it byte-for-byte as shipped so its checksum can be
+# compared against the upstream CDN copy.
+vendor/** -text
